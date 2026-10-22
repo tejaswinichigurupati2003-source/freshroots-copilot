@@ -5,7 +5,7 @@
 - Both migrations are run and `npm run seed` has loaded the data.
 - `.env.local` has `RUN_AS_OF=2026-10-19`, `KILL_SWITCH_PIN` set to a PIN you remember, and `ZOHO_MODE=mock`.
 - For a short demo, set `REJECTION_MIN_LINES=5` so the early warning can fire with a few decisions. The real default is 20.
-- If you re-run the demo, the kill switch must be off and you will see decisions from earlier runs. Start from a fresh Supabase project, or run the checks below in a new run.
+- If you re-run the demo, the kill switch must be off and you will see decisions from earlier runs. Start from a fresh Neon branch or database, or run the checks below in a new run.
 - Start the app with `npm run dev` and open http://localhost:3000. Set **Acting as** to Raghav.
 
 ## Walkthrough
@@ -43,5 +43,5 @@ Open **Audit log**. Show the decisions with who and when, the push, the loss ent
 ## If something goes wrong
 
 - "Stock data is N days old": `RUN_AS_OF` is missing or wrong.
-- A red "Could not load" card: check `SUPABASE_URL`, the service role key, and that both migrations ran.
-- No AI reasons: `GEMINI_API_KEY` or `GEMINI_MODEL` is missing, so template reasons are used. The demo still works.
+- A red "Could not load" card: check `DATABASE_URL` and that `npm run migrate` has run.
+- No AI reasons: `OPENROUTER_API_KEY` is missing, so template reasons are used. The demo still works.

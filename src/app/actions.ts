@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { ACTORS, decide, type Actor } from "@/lib/approval/decide";
 import { getDb } from "@/lib/db/client";
-import { SupabaseDecisionStore } from "@/lib/db/decision-store";
-import { SupabaseMonitorStore } from "@/lib/db/monitor-store";
-import { SupabasePushStore } from "@/lib/db/push-store";
+import { DbDecisionStore } from "@/lib/db/decision-store";
+import { DbMonitorStore } from "@/lib/db/monitor-store";
+import { DbPushStore } from "@/lib/db/push-store";
 import { resumeKillSwitch } from "@/lib/monitor/kill-switch";
 import { recordLoss } from "@/lib/monitor/loss";
 import { checkRejectionWarning } from "@/lib/monitor/rejection";
@@ -41,7 +41,7 @@ export async function decideAction(_previous: DecisionState, formData: FormData)
     return typeof v === "string" ? v : undefined;
   };
 
-  const result = await decide(new SupabaseDecisionStore(getDb()), {
+  const result = await decide(new DbDecisionStore(getDb()), {
     recommendationId: field("recommendationId") ?? "",
     actor: await getActingAs(),
     action: (field("action") ?? "") as "approve",
@@ -51,14 +51,14 @@ export async function decideAction(_previous: DecisionState, formData: FormData)
 
   if (!result.ok) return { error: result.error };
   // Early warning: records an audit entry when the rejection rate is high. The decision is already saved either way.
-  await checkRejectionWarning(new SupabaseMonitorStore(getDb()), getThresholds().REJECTION_MIN_LINES, new Date());
+  await checkRejectionWarning(new DbMonitorStore(getDb()), getThresholds().REJECTION_MIN_LINES, new Date());
   revalidatePath("/");
   return { message: result.message };
 }
 
 export async function pushToZoho(): Promise<DecisionState> {
   try {
-    const result = await pushApproved(await getActingAs(), { store: new SupabasePushStore(getDb()), gateway: createGateway() });
+    const result = await pushApproved(await getActingAs(), { store: new DbPushStore(getDb()), gateway: createGateway() });
     revalidatePath("/");
     if (result.status === "blocked") return { error: result.message };
 
@@ -80,7 +80,7 @@ export async function pushToZoho(): Promise<DecisionState> {
 export async function submitLoss(_previous: DecisionState, formData: FormData): Promise<DecisionState> {
   const field = (name: string) => String(formData.get(name) ?? "");
   const result = await recordLoss(
-    new SupabaseMonitorStore(getDb()),
+    new DbMonitorStore(getDb()),
     { period: field("period"), stockoutLakh: field("stockoutLakh"), overstockLakh: field("overstockLakh"), actor: await getActingAs() },
     getThresholds(),
     new Date(),
@@ -92,7 +92,7 @@ export async function submitLoss(_previous: DecisionState, formData: FormData): 
 
 export async function resumeAction(_previous: DecisionState, formData: FormData): Promise<DecisionState> {
   const result = await resumeKillSwitch(
-    new SupabaseMonitorStore(getDb()),
+    new DbMonitorStore(getDb()),
     { pin: String(formData.get("pin") ?? ""), actor: await getActingAs() },
     process.env.KILL_SWITCH_PIN,
     new Date(),

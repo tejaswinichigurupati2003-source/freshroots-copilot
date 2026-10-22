@@ -10,10 +10,10 @@ The system recommends. Raghav always decides. Class assignment: SAP is simulated
 - Context: rules config (Raghav's 5 rules), calendar.csv festival months, SKU master, guardrails.
 - Processing: TypeScript rules engine in src/lib/rules (pure functions, no I/O, no AI). Data prep checks freshness.
 - AI: Gemini explains flags and classifies edge cases. It never sets a flag or quantity.
-- Output: Supabase tables, approval dashboard, Zoho PO draft push (after approval only), monitor, kill switch.
+- Output: Postgres tables (Neon), approval dashboard, Zoho PO draft push (after approval only), monitor, kill switch.
 
 ## Stack
-Next.js (App Router) + TypeScript, Supabase (Postgres), Zod, Vitest, Tailwind. Use current stable versions.
+Next.js (App Router) + TypeScript, Postgres (Neon, via the pg driver), Zod, Vitest, Tailwind. Use current stable versions.
 
 ## The 5 rules (source of truth: Raghav's documented logic)
 1. HIGH_DEMAND: last 4 weeks average sales > 120% of 12-week average. Order 1.5 x Standard_Reorder_Qty.

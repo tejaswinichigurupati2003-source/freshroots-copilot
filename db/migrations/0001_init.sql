@@ -1,5 +1,5 @@
 -- Freshroots Demand Planning Copilot: initial schema.
--- Run in the Supabase SQL editor. Safe to run once on an empty project.
+-- Applied by `npm run migrate`. Plain Postgres, so it also runs in the Neon SQL editor.
 
 create table distributors (
   distributor_id text primary key,

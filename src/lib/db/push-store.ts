@@ -1,88 +1,61 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditEntry } from "../ingest/pipeline";
 import type { OpenPoLine } from "../zoho/types";
 import type { OpenPoStore } from "../zoho/sync-open-pos";
 import type { ApprovedLine, DraftRecord, PushStore } from "../zoho/push";
+import type { Db } from "./client";
+import { insertRows } from "./sql";
 
-function must<T>(result: { data: T; error: { message: string } | null }, what: string): T {
-  if (result.error) throw new Error(`${what}: ${result.error.message}`);
-  return result.data;
-}
-
-export class SupabasePushStore implements PushStore {
-  constructor(private readonly db: SupabaseClient) {}
+export class DbPushStore implements PushStore {
+  constructor(private readonly db: Db) {}
 
   async getKillSwitch() {
-    const row = must(await this.db.from("system_state").select("is_active, reason").eq("key", "kill_switch").maybeSingle(), "Could not read kill switch");
+    const [row] = await this.db.query<{ is_active: boolean; reason: string | null }>("select is_active, reason from system_state where key = 'kill_switch'");
     return { active: row?.is_active ?? false, reason: row?.reason ?? null };
   }
 
-  async listApprovedLines(): Promise<ApprovedLine[]> {
-    const run = must(
-      await this.db.from("runs").select("id").eq("status", "completed").order("started_at", { ascending: false }).limit(1).maybeSingle(),
-      "Could not read runs",
+  /** Approved, not yet pushed lines of the latest completed run. */
+  listApprovedLines(): Promise<ApprovedLine[]> {
+    return this.db.query<ApprovedLine>(
+      `select r.id as recommendation_id, r.run_id, r.sku_id, s.sku_name, s.distributor_id, d.final_qty
+         from recommendations r
+         join skus s on s.sku_id = r.sku_id
+         join decisions d on d.recommendation_id = r.id
+        where r.status = 'approved'
+          and r.run_id = (select id from runs where status = 'completed' order by started_at desc limit 1)`,
     );
-    if (!run) return [];
-
-    type Row = {
-      id: string;
-      run_id: string;
-      sku_id: string;
-      skus: { sku_name: string; distributor_id: string } | { sku_name: string; distributor_id: string }[];
-      decisions: { final_qty: number; action: string } | { final_qty: number; action: string }[] | null;
-    };
-    const rows = must(
-      await this.db
-        .from("recommendations")
-        .select("id, run_id, sku_id, skus(sku_name, distributor_id), decisions(final_qty, action)")
-        .eq("run_id", run.id)
-        .eq("status", "approved"),
-      "Could not read approved lines",
-    ) as unknown as Row[];
-
-    const first = <T>(v: T | T[] | null) => (Array.isArray(v) ? (v[0] ?? null) : v);
-    return rows.flatMap((r) => {
-      const sku = first(r.skus);
-      const decision = first(r.decisions);
-      if (!sku || !decision) return [];
-      return [{ recommendation_id: r.id, run_id: r.run_id, sku_id: r.sku_id, sku_name: sku.sku_name, distributor_id: sku.distributor_id, final_qty: decision.final_qty }];
-    });
   }
 
   async listPushedSkus(runId: string) {
-    const drafts = must(await this.db.from("zoho_drafts").select("lines").eq("run_id", runId), "Could not read drafts") as { lines: { sku_id: string }[] }[];
+    const drafts = await this.db.query<{ lines: { sku_id: string }[] }>("select lines from zoho_drafts where run_id = $1", [runId]);
     return new Set(drafts.flatMap((d) => d.lines.map((l) => l.sku_id)));
   }
 
   async claimLines(recommendationIds: string[]) {
-    const rows = must(
-      await this.db.from("recommendations").update({ status: "pushed" }).in("id", recommendationIds).eq("status", "approved").select("id"),
-      "Could not claim lines",
-    ) as { id: string }[];
+    const rows = await this.db.query<{ id: string }>(
+      "update recommendations set status = 'pushed' where id = any($1::uuid[]) and status = 'approved' returning id",
+      [recommendationIds],
+    );
     return rows.map((r) => r.id);
   }
 
   async releaseLines(recommendationIds: string[]) {
-    must(await this.db.from("recommendations").update({ status: "approved" }).in("id", recommendationIds).eq("status", "pushed"), "Could not release lines");
+    await this.db.query("update recommendations set status = 'approved' where id = any($1::uuid[]) and status = 'pushed'", [recommendationIds]);
   }
 
   async saveDraft(draft: DraftRecord) {
-    must(await this.db.from("zoho_drafts").insert(draft), "Could not save draft");
+    await insertRows(this.db, "zoho_drafts", [{ ...draft }]);
   }
 
   async audit(entry: AuditEntry) {
-    must(await this.db.from("audit_log").insert(entry), "Could not write audit log");
+    await insertRows(this.db, "audit_log", [{ actor: entry.actor, action: entry.action, entity: entry.entity ?? null, entity_id: entry.entity_id ?? null, details: entry.details ?? {} }]);
   }
 }
 
-export class SupabaseOpenPoStore implements OpenPoStore {
-  constructor(private readonly db: SupabaseClient) {}
+export class DbOpenPoStore implements OpenPoStore {
+  constructor(private readonly db: Db) {}
 
   async replaceOpenPos(lines: OpenPoLine[]) {
-    if (lines.length > 0) must(await this.db.from("open_pos").upsert(lines, { onConflict: "po_id" }), "Could not save open POs");
-    const existing = must(await this.db.from("open_pos").select("po_id"), "Could not read open POs") as { po_id: string }[];
-    const keep = new Set(lines.map((l) => l.po_id));
-    const stale = existing.map((e) => e.po_id).filter((id) => !keep.has(id));
-    if (stale.length > 0) must(await this.db.from("open_pos").delete().in("po_id", stale), "Could not remove closed POs");
+    await insertRows(this.db, "open_pos", lines as unknown as Record<string, unknown>[], "po_id");
+    await this.db.query("delete from open_pos where po_id <> all($1::text[])", [lines.map((l) => l.po_id)]);
   }
 }

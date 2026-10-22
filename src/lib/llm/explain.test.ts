@@ -152,3 +152,11 @@ describe("number guard", () => {
     expect(inventedNumbers("About 87 percent of stock is idle.", facts)).toEqual([87]);
   });
 });
+
+describe("explainAll with fenced JSON", () => {
+  it("accepts an answer wrapped in a markdown code fence", async () => {
+    const { client } = fakeClient((p) => "```json\n" + JSON.stringify(factsIn(p).map((f) => goodAnswer(f))) + "\n```");
+    const result = await explainAll(items, options(client));
+    expect(result.get("SKU001")?.explanation_source).toBe("llm");
+  });
+});

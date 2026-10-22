@@ -1,6 +1,7 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
-import { getDb } from "../src/lib/db/client";
+import { getDb, getPool } from "../src/lib/db/client";
+import { insertRows } from "../src/lib/db/sql";
 import { loadSeedRows, seedTables } from "../src/lib/ingest/seed-files";
 
 const seedDir = path.resolve(__dirname, "../data/seed");
@@ -17,13 +18,12 @@ async function main() {
       console.log(`[dry] ${entry.table}: ${rows.length} rows valid`);
       continue;
     }
-    const { error } = await db.from(entry.table).upsert(rows, { onConflict: entry.conflict });
-    if (error) throw new Error(`${entry.table}: ${error.message}`);
+    await insertRows(db, entry.table, rows, entry.conflict);
     console.log(`${entry.table}: ${rows.length} rows upserted`);
   }
   if (db) {
-    const { error } = await db.from("audit_log").insert({ actor: "system", action: "seed_loaded", details: { tables: seedTables.length } });
-    if (error) throw new Error(`audit_log: ${error.message}`);
+    await insertRows(db, "audit_log", [{ actor: "system", action: "seed_loaded", details: { tables: seedTables.length } }]);
+    await getPool().end();
   }
 }
 

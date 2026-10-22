@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Db } from "./client";
 
 export interface RunSummary {
   id: string;
@@ -47,49 +47,50 @@ export interface Dashboard {
 
 const RUN_COLUMNS = "id, as_of_date, triggered_by, status, error, started_at, finished_at";
 
-function must<T>(result: { data: T; error: { message: string } | null }, what: string): T {
-  if (result.error) throw new Error(`Could not read ${what}: ${result.error.message}`);
-  return result.data;
-}
+type FlatRow = Omit<DashboardRow, "decision"> & {
+  d_decided_by: string | null;
+  d_action: string | null;
+  d_final_qty: number | null;
+  d_reason: string | null;
+  d_decided_at: string | null;
+};
 
-export async function loadDashboard(db: SupabaseClient): Promise<Dashboard> {
-  const [latestRun, shownRun, killSwitch, stock] = await Promise.all([
-    db.from("runs").select(RUN_COLUMNS).order("started_at", { ascending: false }).limit(1).maybeSingle(),
-    db.from("runs").select(RUN_COLUMNS).eq("status", "completed").order("started_at", { ascending: false }).limit(1).maybeSingle(),
-    db.from("system_state").select("is_active, reason, tripped_at").eq("key", "kill_switch").maybeSingle(),
-    db.from("stock_snapshots").select("as_of_date").order("as_of_date", { ascending: false }).limit(1).maybeSingle(),
+export async function loadDashboard(db: Db): Promise<Dashboard> {
+  const [latestRuns, shownRuns, killSwitches, stocks] = await Promise.all([
+    db.query<RunSummary>(`select ${RUN_COLUMNS} from runs order by started_at desc limit 1`),
+    db.query<RunSummary>(`select ${RUN_COLUMNS} from runs where status = 'completed' order by started_at desc limit 1`),
+    db.query<{ is_active: boolean; reason: string | null; tripped_at: string | null }>("select is_active, reason, tripped_at from system_state where key = 'kill_switch'"),
+    db.query<{ as_of_date: string }>("select max(as_of_date) as as_of_date from stock_snapshots"),
   ]);
 
-  const shown = must(shownRun, "runs") as RunSummary | null;
+  const shown = shownRuns[0] ?? null;
   let rows: DashboardRow[] = [];
   if (shown) {
-    const data = must(
-      await db
-        .from("recommendations")
-        .select(
-          "id, sku_id, flag, recommended_qty, weeks_of_cover, spike_ratio, effective_stock, signals, reason, edge_case_type, evidence, explanation_source, status, skus(sku_name), decisions(decided_by, action, final_qty, reason, decided_at)",
-        )
-        .eq("run_id", shown.id),
-      "recommendations",
-    ) as unknown as (Omit<DashboardRow, "sku_name" | "decision"> & {
-      skus: { sku_name: string } | { sku_name: string }[] | null;
-      decisions: DecisionSummary | DecisionSummary[] | null;
-    })[];
-
-    const first = <T>(v: T | T[] | null) => (Array.isArray(v) ? (v[0] ?? null) : v);
-    rows = data.map(({ skus, decisions, ...rest }) => ({
+    const flat = await db.query<FlatRow>(
+      `select r.id, r.sku_id, s.sku_name, r.flag, r.recommended_qty, r.weeks_of_cover, r.spike_ratio, r.effective_stock,
+              r.signals, r.reason, r.edge_case_type, r.evidence, r.explanation_source, r.status,
+              d.decided_by as d_decided_by, d.action as d_action, d.final_qty as d_final_qty, d.reason as d_reason, d.decided_at as d_decided_at
+         from recommendations r
+         join skus s on s.sku_id = r.sku_id
+         left join decisions d on d.recommendation_id = r.id
+        where r.run_id = $1`,
+      [shown.id],
+    );
+    rows = flat.map(({ d_decided_by, d_action, d_final_qty, d_reason, d_decided_at, ...rest }) => ({
       ...rest,
-      sku_name: first(skus)?.sku_name ?? rest.sku_id,
-      decision: first(decisions),
+      decision:
+        d_decided_by === null
+          ? null
+          : { decided_by: d_decided_by, action: d_action as string, final_qty: d_final_qty as number, reason: d_reason, decided_at: d_decided_at as string },
     }));
   }
 
-  const ks = must(killSwitch, "kill switch");
+  const ks = killSwitches[0];
   return {
-    latestRun: must(latestRun, "runs") as RunSummary | null,
+    latestRun: latestRuns[0] ?? null,
     shownRun: shown,
     rows,
     killSwitch: { active: ks?.is_active ?? false, reason: ks?.reason ?? null, tripped_at: ks?.tripped_at ?? null },
-    stockAsOf: must(stock, "stock")?.as_of_date ?? null,
+    stockAsOf: stocks[0]?.as_of_date ?? null,
   };
 }

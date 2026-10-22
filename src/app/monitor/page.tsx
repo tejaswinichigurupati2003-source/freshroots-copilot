@@ -130,7 +130,7 @@ export default async function MonitorPage() {
       <main className="mx-auto max-w-3xl p-8">
         <h1 className="text-2xl font-semibold">Monitor</h1>
         <p role="alert" className="mt-4 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800">
-          Could not load the monitor. Check .env.local and that both migrations have run.
+          Could not load the monitor. Check DATABASE_URL in .env.local and that `npm run migrate` has run.
           <span className="mt-1 block text-xs">{err instanceof Error ? err.message : String(err)}</span>
         </p>
       </main>

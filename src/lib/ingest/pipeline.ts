@@ -24,7 +24,7 @@ export interface AuditEntry {
   details?: Record<string, unknown>;
 }
 
-/** Persistence the pipeline needs. The Supabase version lives in src/lib/db/run-store.ts. */
+/** Persistence the pipeline needs. The Postgres version lives in src/lib/db/run-store.ts. */
 export interface RunStore {
   getKillSwitch(): Promise<{ active: boolean; reason: string | null }>;
   createRun(asOfDate: string, triggeredBy: string): Promise<string>;

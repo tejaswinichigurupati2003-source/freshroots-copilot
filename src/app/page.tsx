@@ -145,7 +145,7 @@ export default async function Home() {
       <main className="mx-auto max-w-3xl p-8">
         <h1 className="text-2xl font-semibold">Reorder recommendations</h1>
         <p role="alert" className="mt-4 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800">
-          Could not load the database. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local and that the migration has run.
+          Could not load the database. Check DATABASE_URL in .env.local and that `npm run migrate` has run.
           <span className="mt-1 block text-xs">{err instanceof Error ? err.message : String(err)}</span>
         </p>
       </main>

@@ -5,9 +5,9 @@ import { buildRecommendations } from "../src/lib/ingest/pipeline";
 import { loadSeedRows, seedTables } from "../src/lib/ingest/seed-files";
 import type { PipelineData } from "../src/lib/ingest/types";
 import { explainAll } from "../src/lib/llm/explain";
-import { createGeminiClient } from "../src/lib/llm/gemini-client";
+import { createOpenRouterClient } from "../src/lib/llm/openrouter-client";
 
-/** Runs the explanation layer on the seed CSVs. No database needed. Uses Gemini when a key is set, templates otherwise. */
+/** Runs the explanation layer on the seed CSVs. No database needed. Uses a Google model through OpenRouter when a key is set, templates otherwise. */
 async function main() {
   if (existsSync(".env.local")) process.loadEnvFile(".env.local");
   const seedDir = path.resolve(__dirname, "../data/seed");
@@ -23,8 +23,8 @@ async function main() {
   const recs = buildRecommendations("2026-10-19", data);
   const before = JSON.stringify(recs.map((r) => [r.sku_id, r.flag, r.recommended_qty]));
 
-  const client = createGeminiClient();
-  console.log(client ? `Using Gemini (${process.env.GEMINI_MODEL})` : "No GEMINI_API_KEY or GEMINI_MODEL set: using template explanations");
+  const client = createOpenRouterClient();
+  console.log(client ? `Using ${process.env.OPENROUTER_MODEL ?? "google/gemini-3.7-flash"} through OpenRouter` : "No OPENROUTER_API_KEY set: using template explanations");
   const audit: unknown[] = [];
   const explanations = await explainAll(
     recs.map((rec) => ({ rec, sku: data.skus.find((s) => s.sku_id === rec.sku_id)! })),
@@ -49,6 +49,7 @@ async function main() {
   });
   console.log(`\nQuantities unchanged by the LLM layer: ${before === after}. Still equal to expected_results.csv: ${matchesKey}.`);
   console.log(`Audit events from the layer: ${audit.length}`);
+  for (const entry of audit) console.log(`  ${JSON.stringify(entry)}`);
 }
 
 main().catch((err) => {

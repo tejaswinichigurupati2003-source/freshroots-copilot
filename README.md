@@ -20,11 +20,11 @@ The components map PDF was not in the repo, so this follows the architecture blo
 | Block | Where it lives |
 |---|---|
 | Trigger | Vercel Cron (`vercel.json`, `30 1 * * 1,4` UTC) calls `GET /api/cron/run`. The **Run now** button calls `POST /api/run`. |
-| Input | `src/lib/ingest`: a `DataSource` interface. `CsvSeedSource` reads the seeded Supabase tables and stands in for the SAP export. `SapSource` is an empty stub. |
+| Input | `src/lib/ingest`: a `DataSource` interface. `CsvSeedSource` reads the seeded Postgres tables and stands in for the SAP export. `SapSource` is an empty stub. |
 | Context | `calendar` (festival months), `skus` (perishability, standard quantity), open POs, and the thresholds in `src/lib/rules/engine.ts`. |
 | Processing | `src/lib/rules` is the pure rules engine. `src/lib/ingest/freshness.ts` blocks a run when stock data is more than 7 days old or a required table is empty. |
 | AI | `src/lib/llm`: facts, prompt, JSON contract, number guard, template fallback, Gemini client. |
-| Output | Supabase tables, the dashboard (`/`), the Zoho gateway (`src/lib/zoho`), the monitor (`/monitor`, `src/lib/monitor`), and the audit log (`/audit`). |
+| Output | Postgres tables, the dashboard (`/`), the Zoho gateway (`src/lib/zoho`), the monitor (`/monitor`, `src/lib/monitor`), and the audit log (`/audit`). |
 
 Design rules that the code enforces:
 
@@ -35,14 +35,18 @@ Design rules that the code enforces:
 
 ## Setup
 
-You need Node 20 or newer and a free [Supabase](https://supabase.com) project.
+You need Node 20 or newer and a free [Neon](https://neon.tech) Postgres database.
 
 ```bash
 npm install
 cp .env.example .env.local   # then fill in the values below
 ```
 
-1. In the Supabase SQL editor, run `supabase/migrations/0001_init.sql`, then `supabase/migrations/0002_multiple_drafts.sql`.
+1. Create the tables. This applies every file in `db/migrations` once, in order, and is safe to run again:
+
+```bash
+npm run migrate
+```
 2. Load the seed data (safe to run twice):
 
 ```bash
@@ -63,8 +67,8 @@ Secrets live only in `.env.local`, which is never committed.
 
 | Variable | Needed for | Notes |
 |---|---|---|
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Everything | Server-side only. |
-| `GEMINI_API_KEY`, `GEMINI_MODEL` | LLM explanations | Optional. Without them every row gets a template explanation. |
+| `DATABASE_URL` | Everything | Neon connection string (with `sslmode=require`). Server-side only. |
+| `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | LLM explanations | Optional. Calls go through OpenRouter to Google models only (`google/...`, default `google/gemini-3.7-flash`), served by Google Vertex or AI Studio with no fallback to other providers. Without a key every row gets a template explanation. |
 | `ZOHO_MODE` | Zoho | `mock` (default) or `live`. |
 | `ZOHO_DC`, `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_ORG_ID`, `ZOHO_MAP_PATH` | Live Zoho only | `ZOHO_DC` defaults to `in`. Also needs `data/zoho_map.csv` (copy `data/zoho_map.example.csv`). |
 | `CRON_SECRET` | Cron route | The cron route rejects every request without it. |
@@ -81,7 +85,7 @@ npm run rubric         # rubric cases T1 to T12 with a pass or fail for each
 npm run typecheck
 npm run seed:dry       # validates the seed CSVs without a database
 npm run explain:demo   # the explanation layer on the seed data, no database needed
-npm run run:pipeline   # a real run against Supabase, compared with the answer key
+npm run run:pipeline   # a real run against Postgres, compared with the answer key
 ```
 
 `npm run rubric` checks T10 and T11 with a scripted stand-in for Gemini, so it proves the explanation path and not the live model. Run `npm run explain:demo` with a key to see real output.

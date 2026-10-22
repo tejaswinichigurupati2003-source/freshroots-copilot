@@ -33,7 +33,8 @@ function parseBatch(raw: string, wanted: Set<string>): Map<string, ReturnType<ty
   const valid = new Map<string, ReturnType<typeof explanationSchema.parse>>();
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    // Models sometimes wrap JSON in a markdown fence.
+    parsed = JSON.parse(raw.trim().replace(/^```(?:json)?s*/i, "").replace(/s*```$/, ""));
   } catch {
     return valid;
   }

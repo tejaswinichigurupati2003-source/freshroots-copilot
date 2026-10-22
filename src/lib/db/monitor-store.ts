@@ -1,62 +1,57 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditEntry } from "../ingest/pipeline";
 import { lossLevel, type LossLevel } from "../monitor/loss";
 import { currentRejectionStatus, type RejectionStatus } from "../monitor/rejection";
 import type { KillSwitchState, LossEntry, MonitorStore, Thresholds } from "../monitor/types";
+import type { Db } from "./client";
+import { insertRows } from "./sql";
 
-function must<T>(result: { data: T; error: { message: string } | null }, what: string): T {
-  if (result.error) throw new Error(`${what}: ${result.error.message}`);
-  return result.data;
-}
+export class DbMonitorStore implements MonitorStore {
+  constructor(private readonly db: Db) {}
 
-export class SupabaseMonitorStore implements MonitorStore {
-  constructor(private readonly db: SupabaseClient) {}
-
-  async listDecisionsSince(since: Date) {
-    return must(
-      await this.db.from("decisions").select("action, decided_at").gte("decided_at", since.toISOString()),
-      "Could not read decisions",
-    ) as { action: string; decided_at: string }[];
+  listDecisionsSince(since: Date) {
+    return this.db.query<{ action: string; decided_at: string }>("select action, decided_at from decisions where decided_at >= $1", [since.toISOString()]);
   }
 
   async countAuditSince(action: string, since: Date) {
-    const result = await this.db.from("audit_log").select("id", { count: "exact", head: true }).eq("action", action).gte("at", since.toISOString());
-    if (result.error) throw new Error(`Could not read audit log: ${result.error.message}`);
-    return result.count ?? 0;
+    const [row] = await this.db.query<{ n: number }>("select count(*)::int as n from audit_log where action = $1 and at >= $2", [action, since.toISOString()]);
+    return row?.n ?? 0;
   }
 
   async saveActualLoss(entry: { period: string; stockout_loss_lakh: number; overstock_loss_lakh: number; entered_by: string }) {
-    const existing = must(await this.db.from("loss_tracking").select("source").eq("period", entry.period).maybeSingle(), "Could not read losses");
+    const [existing] = await this.db.query<{ source: string }>("select source from loss_tracking where period = $1", [entry.period]);
     if (existing && existing.source !== "actual") {
       throw new Error(`${entry.period} is a baseline period and cannot be overwritten. Enter the current quarter instead.`);
     }
-    must(await this.db.from("loss_tracking").upsert({ ...entry, source: "actual" }, { onConflict: "period" }), "Could not save loss");
+    await this.db.query(
+      `insert into loss_tracking (period, stockout_loss_lakh, overstock_loss_lakh, source, entered_by)
+       values ($1, $2, $3, 'actual', $4)
+       on conflict (period) do update
+         set stockout_loss_lakh = excluded.stockout_loss_lakh, overstock_loss_lakh = excluded.overstock_loss_lakh,
+             entered_by = excluded.entered_by, created_at = now()`,
+      [entry.period, entry.stockout_loss_lakh, entry.overstock_loss_lakh, entry.entered_by],
+    );
   }
 
   async getKillSwitch(): Promise<KillSwitchState> {
-    const row = must(
-      await this.db.from("system_state").select("is_active, reason, tripped_at, resumed_at, resumed_by").eq("key", "kill_switch").maybeSingle(),
-      "Could not read kill switch",
+    const [row] = await this.db.query<KillSwitchState & { is_active: boolean }>(
+      "select is_active, reason, tripped_at, resumed_at, resumed_by from system_state where key = 'kill_switch'",
     );
     return { active: row?.is_active ?? false, reason: row?.reason ?? null, tripped_at: row?.tripped_at ?? null, resumed_at: row?.resumed_at ?? null, resumed_by: row?.resumed_by ?? null };
   }
 
   async tripKillSwitch(reason: string, at: Date) {
-    must(
-      await this.db.from("system_state").update({ is_active: true, reason, tripped_at: at.toISOString(), resumed_at: null, resumed_by: null }).eq("key", "kill_switch"),
-      "Could not turn the kill switch on",
+    await this.db.query(
+      "update system_state set is_active = true, reason = $1, tripped_at = $2, resumed_at = null, resumed_by = null where key = 'kill_switch'",
+      [reason, at.toISOString()],
     );
   }
 
   async resumeKillSwitch(by: string, at: Date) {
-    must(
-      await this.db.from("system_state").update({ is_active: false, resumed_at: at.toISOString(), resumed_by: by }).eq("key", "kill_switch"),
-      "Could not turn the kill switch off",
-    );
+    await this.db.query("update system_state set is_active = false, resumed_at = $2, resumed_by = $1 where key = 'kill_switch'", [by, at.toISOString()]);
   }
 
   async audit(entry: AuditEntry) {
-    must(await this.db.from("audit_log").insert(entry), "Could not write audit log");
+    await insertRows(this.db, "audit_log", [{ actor: entry.actor, action: entry.action, entity: entry.entity ?? null, entity_id: entry.entity_id ?? null, details: entry.details ?? {} }]);
   }
 }
 
@@ -70,14 +65,15 @@ export interface MonitorView {
   thresholds: Thresholds;
 }
 
-export async function loadMonitor(db: SupabaseClient, thresholds: Thresholds, now: Date = new Date()): Promise<MonitorView> {
-  const store = new SupabaseMonitorStore(db);
-  const [rejection, killSwitch, losses] = await Promise.all([
+export async function loadMonitor(db: Db, thresholds: Thresholds, now: Date = new Date()): Promise<MonitorView> {
+  const store = new DbMonitorStore(db);
+  const [rejection, killSwitch, entries] = await Promise.all([
     currentRejectionStatus(store, thresholds.REJECTION_MIN_LINES, now),
     store.getKillSwitch(),
-    db.from("loss_tracking").select("period, stockout_loss_lakh, overstock_loss_lakh, total_loss_lakh, source, entered_by, created_at").order("created_at", { ascending: false }),
+    db.query<LossEntry>(
+      "select period, stockout_loss_lakh, overstock_loss_lakh, total_loss_lakh, source, entered_by, created_at from loss_tracking order by created_at desc, id desc",
+    ),
   ]);
-  const entries = must(losses, "Could not read losses") as LossEntry[];
   const latest = entries.find((e) => e.source === "actual") ?? null;
 
   return {
