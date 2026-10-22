@@ -1,0 +1,5 @@
+period,stockout_loss_lakh,overstock_loss_lakh,total_loss_lakh,source
+Jul-Sep 2025,19,10,29,"Invented to fit case brief ranges (18-22L stockout, 10-12L overstock per quarter)"
+Oct-Dec 2025,22,12,34,"Invented to fit case brief ranges (18-22L stockout, 10-12L overstock per quarter)"
+Jan-Mar 2026,18,11,29,"Invented to fit case brief ranges (18-22L stockout, 10-12L overstock per quarter)"
+Apr-Jun 2026,21,10,31,"Invented to fit case brief ranges (18-22L stockout, 10-12L overstock per quarter)"

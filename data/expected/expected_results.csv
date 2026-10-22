@@ -1,0 +1,19 @@
+SKU_ID,SKU_Name,Expected_Flag,Expected_Order_Qty,Spike_4wk_vs_12wk,Weeks_Of_Cover,Effective_Stock,Indicative_Exposure_INR,Note
+SKU001,Freshroots Mango Drink 200ml,STOCKOUT_RISK,750,Y,3.4,900,4271,limits 6-14 wks; open PO units 0
+SKU002,Freshroots Oats Cookies 150g,OK,0,N,11.5,1200,0,limits 6-14 wks; open PO units 0
+SKU003,Freshroots Brown Rice 1kg,OK,0,N,6.5,1220,0,limits 6-14 wks; open PO units 400
+SKU004,Freshroots Almond Milk 500ml,OK,0,N,3.3,330,0,limits 3-4 wks; open PO units 150
+SKU005,Freshroots Mixed Nuts 100g,OK,0,N,8.1,600,0,limits 6-14 wks; open PO units 0
+SKU006,Freshroots Quinoa 500g,OVERSTOCK_RISK,0,N,22.2,1100,9164,limits 6-14 wks; open PO units 0
+SKU007,Freshroots Coconut Water 330ml,OVERSTOCK_RISK,0,N,4.1,620,375,limits 3-4 wks; open PO units 0
+SKU008,Freshroots Granola Bar 40g,OK,0,N,9.2,1250,0,limits 6-14 wks; open PO units 300
+SKU009,Freshroots Chia Seeds 200g,OK,0,N,9.4,400,0,limits 6-14 wks; open PO units 0
+SKU010,Freshroots Apple Cider Vinegar 500ml,OK,0,N,8.5,260,0,limits 6-14 wks; open PO units 0
+SKU011,Freshroots Multigrain Bread 400g,STOCKOUT_RISK,500,N,1.8,460,3981,limits 3-4 wks; open PO units 0
+SKU012,Freshroots Herbal Tea 25 bags,OK,0,N,8.9,630,0,limits 6-14 wks; open PO units 150
+SKU013,Freshroots Peanut Butter 300g,STOCKOUT_RISK,120,N,5.3,300,1625,limits 6-14 wks; open PO units 120
+SKU014,Freshroots Dark Chocolate 80g,OK,0,N,6.8,620,0,limits 6-14 wks; open PO units 0
+SKU015,Freshroots Honey 500g,OK,0,N,9.7,360,0,limits 6-14 wks; open PO units 0
+SKU016,Freshroots Protein Bar 50g,INSUFFICIENT_HISTORY,0,,,200,0,Edge case: Raghav sizes the order
+SKU017,Freshroots Peanut Crunch Bar 30g,OK,0,N,12.7,1750,0,limits 6-14 wks; open PO units 0
+SKU018,Freshroots Roasted Chickpeas 150g,STOCKOUT_RISK,225,Y,2.4,250,4972,limits 6-14 wks; open PO units 0

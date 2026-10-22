@@ -1,0 +1,4 @@
+SKU_ID,Scenario,What_the_rules_do,What_the_system_should_do
+SKU016,New launch: only 3 weeks of sales,"12-week average is undefined, so rules cannot run","Mark as edge case, show the launch ramp, ask Raghav to size the order"
+SKU017,"Distributor drop: last 4 wks about 28% below the 12-wk average, stock 1750","Cover under festival uplift is 12.7 wks, so no overstock flag (a miss)",LLM notes the recent decline and warns of likely overstock for Raghav's review
+SKU018,One-off spike: week 2026-W41 sold 240 vs about 70 normal,"HIGH_DEMAND and STOCKOUT_RISK fire, recommending 1.5x standard","LLM notes a single-week spike, not a trend, and flags it before Raghav approves 1.5x"

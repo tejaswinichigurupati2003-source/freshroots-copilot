@@ -1,0 +1,21 @@
+Month,SKU_ID,Raghav_Flag,Order_Qty_Multiple_Of_Standard,Raghav_Action,Basis,Notes
+2026-03,SKU001,HIGH_DEMAND,1.5x,Reorder 1.5x standard,rule_1_festival,Festival uplift applied
+2026-03,SKU003,STOCKOUT_RISK,1.0x,Immediate reorder,rule_2_festival,Cover fell under 6 wks after uplift
+2026-03,SKU006,OVERSTOCK_RISK,0,Pause next order,rule_3,Above 14 wks even after uplift
+2026-03,SKU008,HIGH_DEMAND,1.5x,Reorder 1.5x standard,rule_1_festival,
+2026-07,SKU013,STOCKOUT_RISK,1.0x,Immediate reorder,rule_2,
+2026-07,SKU004,STOCKOUT_RISK,1.0x,Immediate reorder,rule_5_perishable,Perishable minimum 3 wks breached
+2026-07,SKU006,OVERSTOCK_RISK,0,Pause next order,rule_3,
+2026-07,SKU014,HIGH_DEMAND,1.5x,Reorder 1.5x standard,rule_1,
+2026-07,SKU002,OVERSTOCK_RISK,0,Pause next order,rule_3,"Just over 14 wks, no festival uplift"
+2026-08,SKU001,HIGH_DEMAND,1.5x,Reorder 1.5x standard,rule_1,
+2026-08,SKU007,OVERSTOCK_RISK,0,Pause next order,rule_5_perishable,Perishable maximum 4 wks breached
+2026-08,SKU011,STOCKOUT_RISK,1.0x,Immediate reorder,rule_5_perishable,
+2026-08,SKU003,STOCKOUT_RISK,1.0x,Immediate reorder,rule_2,
+2026-08,SKU010,OVERSTOCK_RISK,0,Pause next order,rule_3,
+2026-09,SKU005,HIGH_DEMAND,1.5x,Reorder 1.5x standard,rule_1,
+2026-09,SKU004,STOCKOUT_RISK,1.0x,Immediate reorder,rule_5_perishable,
+2026-09,SKU016,NEW_LAUNCH,2.0x,Launch order sized by judgment,judgment,No sales history; sized from distributor pre-orders
+2026-09,SKU017,DISTRIBUTOR_DROP,0.5x,Order cut by judgment,judgment,DIST002 reduced orders after a competitor scheme
+2026-09,SKU012,FESTIVAL_BUNDLE,1.0x,Extra stock for gifting bundle,judgment,Diwali gift pack not visible in sales history
+2026-09,SKU015,OVERSTOCK_RISK,0,Pause next order,rule_3,
