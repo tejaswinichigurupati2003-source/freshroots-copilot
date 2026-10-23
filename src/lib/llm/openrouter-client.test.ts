@@ -38,6 +38,7 @@ describe("createOpenRouterClient", () => {
       model: "google/gemini-3.7-flash",
       messages: [{ role: "system", content: "sys" }, { role: "user", content: "hi" }],
       provider: { only: ["google-vertex", "google-ai-studio"], allow_fallbacks: false },
+      max_tokens: 8192,
     });
     expect(GOOGLE_PROVIDER_ROUTING.allow_fallbacks).toBe(false);
   });
@@ -60,9 +61,9 @@ describe("createOpenRouterClient", () => {
     expect(calls).toHaveLength(4);
   });
 
-  it("stops at once on 402 out of credits", async () => {
-    const { fetchFn, calls } = fakeFetch(new Response("{}", { status: 402 }));
-    await expect(ask(createOpenRouterClient(env, { fetchFn, sleep: noSleep })!)).rejects.toThrow("out of credits");
+  it("stops at once on 402 and repeats what OpenRouter said", async () => {
+    const { fetchFn, calls } = fakeFetch(new Response(JSON.stringify({ error: { message: "Insufficient credits" } }), { status: 402 }));
+    await expect(ask(createOpenRouterClient(env, { fetchFn, sleep: noSleep })!)).rejects.toThrow("HTTP 402): Insufficient credits.");
     expect(calls).toHaveLength(1);
   });
 
@@ -74,7 +75,7 @@ describe("createOpenRouterClient", () => {
 
     const failing = fakeFetch(new Response(JSON.stringify({ error: { message: "No endpoints found" } }), { status: 404 }));
     const error = await ask(createOpenRouterClient(env, { fetchFn: failing.fetchFn })!).catch((e: Error) => e);
-    expect((error as Error).message).toBe("OpenRouter call failed (HTTP 404): No endpoints found");
+    expect((error as Error).message).toBe("OpenRouter call failed (HTTP 404): No endpoints found.");
     expect((error as Error).message).not.toContain("test-key-123");
   });
 });

@@ -5,6 +5,7 @@ import { PushButton } from "@/components/push-button";
 import { RowActions } from "@/components/row-actions";
 import { RunNowButton } from "@/components/run-now-button";
 import { Sparkline } from "@/components/sparkline";
+import { decisionText, orderText } from "@/lib/approval/labels";
 import { can } from "@/lib/approval/roles";
 import { needsReview, sortForReview } from "@/lib/approval/review";
 import { getDb } from "@/lib/db/client";
@@ -18,8 +19,6 @@ export const dynamic = "force-dynamic";
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }) + " IST";
 
-const DECISION_LABEL: Record<string, string> = { approved: "Approved", edited: "Approved (quantity changed)", rejected: "Rejected" };
-
 function trend(row: DashboardRow): number[] {
   const weeks = (row.signals.recentWeeks ?? []) as { units: number }[];
   return weeks.map((w) => w.units);
@@ -31,7 +30,7 @@ function DecisionCell({ row, canDecide }: { row: DashboardRow; canDecide: boolea
     return (
       <div className="min-w-56 text-xs text-slate-700">
         <p className="font-medium">
-          {DECISION_LABEL[d.action] ?? d.action}: {d.final_qty} units
+          {decisionText(d.action, d.final_qty)}
         </p>
         <p>
           by {d.decided_by}, {when(d.decided_at)}
@@ -68,7 +67,7 @@ function RecommendationRow({ row, canDecide }: { row: DashboardRow; canDecide: b
           <EdgeBadge type={row.edge_case_type} hasSignals={hasSignals} />
         </div>
       </td>
-      <td className="px-3 py-3 text-right tabular-nums">{row.recommended_qty}</td>
+      <td className="px-3 py-3 text-right tabular-nums">{orderText(row.flag, row.recommended_qty)}</td>
       <td className="px-3 py-3 text-right tabular-nums">{row.weeks_of_cover === null ? "n/a" : row.weeks_of_cover.toFixed(1)}</td>
       <td className="px-3 py-3">
         <Sparkline values={trend(row)} />
@@ -84,7 +83,7 @@ function RecommendationRow({ row, canDecide }: { row: DashboardRow; canDecide: b
   );
 }
 
-const headers = ["SKU", "Flag", "Recommended qty", "Weeks of cover", "12-week sales", "Why", "Decision"];
+const headers = ["SKU", "Flag", "Recommended order", "Weeks of cover", "12-week sales", "Why", "Decision"];
 
 function Table({ rows, canDecide }: { rows: DashboardRow[]; canDecide: boolean }) {
   return (

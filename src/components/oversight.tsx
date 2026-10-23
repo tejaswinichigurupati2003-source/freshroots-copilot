@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { finalQtyText, orderText } from "@/lib/approval/labels";
 import type { DashboardRow } from "@/lib/db/dashboard";
 import type { MonitorView } from "@/lib/db/monitor-store";
 
@@ -68,7 +69,7 @@ export function OversightPanel({ reviewRows, monitor }: { reviewRows: DashboardR
             <tr>
               <th className="px-3 py-2 font-medium">SKU</th>
               <th className="px-3 py-2 font-medium">Raghav&rsquo;s call</th>
-              <th className="px-3 py-2 text-right font-medium">Recommended</th>
+              <th className="px-3 py-2 text-right font-medium">Recommended order</th>
               <th className="px-3 py-2 text-right font-medium">Final</th>
               <th className="px-3 py-2 font-medium">Reason</th>
               <th className="px-3 py-2 font-medium">When (IST)</th>
@@ -90,8 +91,8 @@ export function OversightPanel({ reviewRows, monitor }: { reviewRows: DashboardR
                     <span className="font-medium">{r.sku_id}</span> <span className="text-xs text-slate-600">{r.sku_name}</span>
                   </td>
                   <td className="px-3 py-2">{CALL[r.decision?.action ?? ""] ?? r.decision?.action}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.recommended_qty}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.decision?.final_qty}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{orderText(r.flag, r.recommended_qty)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{r.decision?.action === "rejected" ? "None" : finalQtyText(r.decision?.final_qty ?? 0)}</td>
                   <td className="px-3 py-2 text-slate-700">{r.decision?.reason ?? ""}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{r.decision ? when(r.decision.decided_at) : ""}</td>
                 </tr>

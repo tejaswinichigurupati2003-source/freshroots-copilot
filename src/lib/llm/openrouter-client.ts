@@ -14,6 +14,12 @@ export const DEFAULT_MODEL = "google/gemini-3.7-flash";
 export const GOOGLE_PROVIDER_ROUTING = { only: ["google-vertex", "google-ai-studio"], allow_fallbacks: false } as const;
 
 const RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
+/**
+ * Always cap the reply. OpenRouter refuses (HTTP 402) any request whose maximum possible cost exceeds the balance,
+ * and with no cap Gemini asks for 65,536 tokens. A batch of explanations is a few hundred tokens, but Gemini also
+ * spends tokens thinking, so leave generous room.
+ */
+const MAX_TOKENS = 8192;
 
 export interface LlmUsage {
   model: string;
@@ -62,12 +68,11 @@ export function createOpenRouterClient(env: Record<string, string | undefined> =
               { role: "user", content: prompt },
             ],
             temperature: 0.2,
+            max_tokens: MAX_TOKENS,
             provider: GOOGLE_PROVIDER_ROUTING,
           }),
           signal: AbortSignal.timeout(timeoutMs),
         });
-
-        if (response.status === 402) throw new Error("OpenRouter is out of credits (HTTP 402). Add credits and run again.");
 
         const retryable = response.status === 429 || response.status >= 500;
         if (retryable && attempt < RETRY_DELAYS_MS.length) {
@@ -76,7 +81,11 @@ export function createOpenRouterClient(env: Record<string, string | undefined> =
         }
 
         const body = (await response.json().catch(() => ({}))) as ChatResponse;
-        if (!response.ok) throw new Error(`OpenRouter call failed (HTTP ${response.status}): ${body.error?.message ?? "no message"}`);
+        if (!response.ok) {
+          // 402 is a payment problem. Repeat OpenRouter's own words instead of guessing which one (account balance, key limit or upstream billing).
+          const hint = response.status === 402 ? " Check the OpenRouter credit balance, the key limit and the Google billing behind it." : "";
+          throw new Error(`OpenRouter call failed (HTTP ${response.status}): ${body.error?.message ?? "no message"}.${hint}`);
+        }
 
         const text = body.choices?.[0]?.message?.content;
         if (!text) throw new Error("OpenRouter returned no text");
