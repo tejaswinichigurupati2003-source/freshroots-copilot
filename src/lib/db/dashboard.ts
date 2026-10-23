@@ -1,3 +1,4 @@
+import { exposureInr } from "../approval/exposure";
 import type { Db } from "./client";
 
 export interface RunSummary {
@@ -33,6 +34,8 @@ export interface DashboardRow {
   evidence: string | null;
   explanation_source: string | null;
   status: string;
+  /** Indicative rupees at risk if nothing is done (see approval/exposure.ts). */
+  exposure_inr: number;
   decision: DecisionSummary | null;
 }
 
@@ -47,7 +50,10 @@ export interface Dashboard {
 
 const RUN_COLUMNS = "id, as_of_date, triggered_by, status, error, started_at, finished_at";
 
-type FlatRow = Omit<DashboardRow, "decision"> & {
+type FlatRow = Omit<DashboardRow, "decision" | "exposure_inr"> & {
+  perishability: string;
+  stockout_loss: number;
+  overstock_loss: number;
   d_decided_by: string | null;
   d_action: string | null;
   d_final_qty: number | null;
@@ -69,15 +75,26 @@ export async function loadDashboard(db: Db): Promise<Dashboard> {
     const flat = await db.query<FlatRow>(
       `select r.id, r.sku_id, s.sku_name, r.flag, r.recommended_qty, r.weeks_of_cover, r.spike_ratio, r.effective_stock,
               r.signals, r.reason, r.edge_case_type, r.evidence, r.explanation_source, r.status,
+              s.perishability, coalesce(e.stockout_loss_per_unit_inr, 0) as stockout_loss, coalesce(e.overstock_loss_per_unit_inr, 0) as overstock_loss,
               d.decided_by as d_decided_by, d.action as d_action, d.final_qty as d_final_qty, d.reason as d_reason, d.decided_at as d_decided_at
          from recommendations r
          join skus s on s.sku_id = r.sku_id
+         left join sku_economics e on e.sku_id = r.sku_id
          left join decisions d on d.recommendation_id = r.id
         where r.run_id = $1`,
       [shown.id],
     );
-    rows = flat.map(({ d_decided_by, d_action, d_final_qty, d_reason, d_decided_at, ...rest }) => ({
+    rows = flat.map(({ d_decided_by, d_action, d_final_qty, d_reason, d_decided_at, perishability, stockout_loss, overstock_loss, ...rest }) => ({
       ...rest,
+      exposure_inr: exposureInr({
+        flag: rest.flag,
+        effectiveStock: rest.effective_stock,
+        avg12: (rest.signals.avg12 as number | null | undefined) ?? null,
+        festival: Boolean(rest.signals.isFestivalMonth),
+        perishability,
+        stockoutLossPerUnit: stockout_loss,
+        overstockLossPerUnit: overstock_loss,
+      }),
       decision:
         d_decided_by === null
           ? null

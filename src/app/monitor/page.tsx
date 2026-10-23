@@ -1,126 +1,133 @@
-import { Banners, NavLinks } from "@/components/banners";
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import { Banners, Masthead } from "@/components/banners";
 import { LossForm, ResumeForm } from "@/components/monitor-forms";
-import { can, denial } from "@/lib/approval/roles";
 import type { Actor } from "@/lib/approval/decide";
+import { can, denial } from "@/lib/approval/roles";
 import { getDb } from "@/lib/db/client";
 import { loadMonitor, type MonitorView } from "@/lib/db/monitor-store";
-import { getThresholds } from "@/lib/monitor/types";
 import { ROLLING_DAYS } from "@/lib/monitor/rejection";
+import { getThresholds } from "@/lib/monitor/types";
 import { getActingAs } from "@/lib/session";
 
+export const metadata: Metadata = { title: "Monitor" };
 export const dynamic = "force-dynamic";
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }) + " IST";
-const card = "rounded-lg border border-slate-200 bg-white p-5";
 
-function RejectionCard({ monitor }: { monitor: MonitorView }) {
-  const { rejection, minLines } = monitor;
+function Section({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
   return (
-    <section className={card}>
-      <h2 className="text-lg font-semibold">Rejection rate, last {ROLLING_DAYS} days</h2>
-      {rejection.evaluated && rejection.rate !== null ? (
-        <p className="mt-2 text-3xl font-semibold tabular-nums">
-          {Math.round(rejection.rate * 100)}%
-          <span className="ml-2 text-sm font-normal text-slate-600">
-            {rejection.rejected} of {rejection.decided} decided lines rejected
-          </span>
-        </p>
-      ) : (
-        <p className="mt-2 text-sm text-slate-700">
-          Not measured yet: {rejection.decided} of {minLines} decided lines needed.
-        </p>
-      )}
-      <p className="mt-2 text-sm text-slate-600">
-        A healthy range is 15% to 30%. Above 50% raises an early warning for a manual review. The system keeps running.
-      </p>
+    <section className="border-t-2 border-ink pt-4">
+      <p className="eyebrow">{eyebrow}</p>
+      <h2 className="mt-1 text-[28px]">{title}</h2>
+      <div className="mt-4">{children}</div>
     </section>
   );
 }
 
-function LossCard({ monitor, actor }: { monitor: MonitorView; actor: Actor }) {
+function Figure({ label, value, note, tone }: { label: string; value: ReactNode; note?: string; tone?: string }) {
+  return (
+    <div>
+      <p className="eyebrow">{label}</p>
+      <p className="mt-1 font-display text-[34px] leading-none" style={tone ? { color: tone } : undefined}>
+        {value}
+      </p>
+      {note && <p className="mt-1.5 text-[13px] text-ink-soft">{note}</p>}
+    </div>
+  );
+}
+
+function RejectionSection({ monitor }: { monitor: MonitorView }) {
+  const { rejection, minLines } = monitor;
+  const measured = rejection.evaluated && rejection.rate !== null;
+  return (
+    <Section eyebrow={`Early warning, last ${ROLLING_DAYS} days`} title="How often Raghav says no">
+      <div className="flex flex-wrap items-end gap-x-12 gap-y-4">
+        <Figure
+          label="Rejection rate"
+          value={measured ? <span className="num">{Math.round((rejection.rate as number) * 100)}%</span> : <span className="font-display text-[26px] italic text-ink-soft">not measured yet</span>}
+          note={measured ? `${rejection.rejected} of ${rejection.decided} decided lines rejected` : `${rejection.decided} of ${minLines} decided lines needed first`}
+          tone={rejection.warning ? "var(--color-turmeric)" : undefined}
+        />
+        <p className="max-w-md text-sm text-ink-soft">
+          A healthy range is <span className="num">15%</span> to <span className="num">30%</span>. Above <span className="num">50%</span> raises an early warning for a manual review. The system keeps running either way.
+        </p>
+      </div>
+    </Section>
+  );
+}
+
+function LossSection({ monitor, actor }: { monitor: MonitorView; actor: Actor }) {
   const { latestActual, thresholds, losses } = monitor;
   const baseline = thresholds.BASELINE_LOSS_LAKH;
   const target = Math.round(baseline * 0.75 * 100) / 100;
+  const tone = latestActual?.level === "stop" ? "var(--color-tomato)" : latestActual?.level === "warn" ? "var(--color-turmeric)" : undefined;
+
   return (
-    <section className={card}>
-      <h2 className="text-lg font-semibold">Loss against baseline (lakh per quarter)</h2>
-      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-4">
-        <div>
-          <dt className="text-slate-600">Baseline</dt>
-          <dd className="text-2xl font-semibold tabular-nums">{baseline}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-600">Target (25% lower)</dt>
-          <dd className="text-2xl font-semibold tabular-nums">{target}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-600">Latest actual{latestActual ? ` (${latestActual.period})` : ""}</dt>
-          <dd className="text-2xl font-semibold tabular-nums">{latestActual ? Number(latestActual.total_loss_lakh) : "None yet"}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-600">Versus baseline</dt>
-          <dd className="text-2xl font-semibold tabular-nums">
-            {latestActual ? `${Math.round(((Number(latestActual.total_loss_lakh) - baseline) / baseline) * 100)}%` : "n/a"}
-          </dd>
-        </div>
-      </dl>
-      <p className="mt-3 text-sm text-slate-600">
-        Warning above {thresholds.LOSS_WARN_LAKH} lakh. Automatic stop above {thresholds.LOSS_STOP_LAKH} lakh.
+    <Section eyebrow="Lagging check, lakh per quarter" title="Loss against the baseline">
+      <div className="grid gap-x-10 gap-y-5 sm:grid-cols-4">
+        <Figure label="Baseline" value={<span className="num">{baseline}</span>} note="Mean of the last four quarters" />
+        <Figure label="Target, 25% lower" value={<span className="num">{target}</span>} />
+        <Figure label={`Latest actual${latestActual ? `, ${latestActual.period}` : ""}`} value={latestActual ? <span className="num">{Number(latestActual.total_loss_lakh)}</span> : <span className="font-display text-[26px] italic text-ink-soft">none yet</span>} tone={tone} />
+        <Figure label="Against baseline" value={latestActual ? <span className="num">{Math.round(((Number(latestActual.total_loss_lakh) - baseline) / baseline) * 100)}%</span> : <span className="text-ink-faint">-</span>} tone={tone} />
+      </div>
+      <p className="mt-4 text-sm text-ink-soft">
+        Warning above <span className="num">{thresholds.LOSS_WARN_LAKH}</span> lakh. The system stops on its own above <span className="num">{thresholds.LOSS_STOP_LAKH}</span> lakh.
       </p>
 
-      <h3 className="mt-5 text-sm font-semibold">Enter a quarter&rsquo;s actual loss</h3>
-      <div className="mt-2">
-        {can(actor, "enter_loss") ? <LossForm /> : <p className="text-sm text-slate-600">{denial(actor, "enter_loss")} Switch to Deepa to enter a figure.</p>}
+      <div className="panel mt-5 p-4">
+        <h3 className="text-lg">Enter a quarter&rsquo;s actual loss</h3>
+        <div className="mt-3">
+          {can(actor, "enter_loss") ? <LossForm /> : <p className="text-sm text-ink-soft">{denial(actor, "enter_loss")} Switch to Deepa to enter a figure.</p>}
+        </div>
       </div>
 
-      <table className="mt-5 w-full text-left text-sm">
-        <thead className="text-xs uppercase tracking-wide text-slate-600">
-          <tr>
-            <th className="py-1 font-medium">Quarter</th>
-            <th className="py-1 text-right font-medium">Stockout</th>
-            <th className="py-1 text-right font-medium">Overstock</th>
-            <th className="py-1 text-right font-medium">Total</th>
-            <th className="py-1 pl-4 font-medium">Source</th>
-          </tr>
-        </thead>
-        <tbody>
-          {losses.map((l) => (
-            <tr key={l.period} className="border-t border-slate-100">
-              <td className="py-1">{l.period}</td>
-              <td className="py-1 text-right tabular-nums">{Number(l.stockout_loss_lakh)}</td>
-              <td className="py-1 text-right tabular-nums">{Number(l.overstock_loss_lakh)}</td>
-              <td className="py-1 text-right tabular-nums">{Number(l.total_loss_lakh)}</td>
-              <td className="py-1 pl-4 text-slate-600">{l.source === "actual" ? `Entered by ${l.entered_by ?? "unknown"}` : "Baseline (invented)"}</td>
+      <div className="mt-5 overflow-x-auto">
+        <table className="ledger">
+          <thead>
+            <tr>
+              <th>Quarter</th>
+              <th className="!text-right">Stockout</th>
+              <th className="!text-right">Overstock</th>
+              <th className="!text-right">Total</th>
+              <th>Source</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
+          </thead>
+          <tbody>
+            {losses.map((l) => (
+              <tr key={l.period}>
+                <td className="!py-2.5">{l.period}</td>
+                <td className="num !py-2.5 text-right">{Number(l.stockout_loss_lakh)}</td>
+                <td className="num !py-2.5 text-right">{Number(l.overstock_loss_lakh)}</td>
+                <td className="num !py-2.5 text-right font-semibold">{Number(l.total_loss_lakh)}</td>
+                <td className="!py-2.5 text-ink-soft">{l.source === "actual" ? `Entered by ${l.entered_by ?? "unknown"}` : "Baseline quarter"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Section>
   );
 }
 
-function KillSwitchCard({ monitor, actor }: { monitor: MonitorView; actor: Actor }) {
+function KillSwitchSection({ monitor, actor }: { monitor: MonitorView; actor: Actor }) {
   const { killSwitch } = monitor;
   return (
-    <section className={card}>
-      <h2 className="text-lg font-semibold">Kill switch</h2>
+    <Section eyebrow="Automatic stop" title="Kill switch">
       {killSwitch.active ? (
-        <>
-          <p className="mt-2 text-sm font-medium text-red-700">
-            ON since {killSwitch.tripped_at ? when(killSwitch.tripped_at) : "unknown"}. {killSwitch.reason}
-          </p>
-          <p className="mt-1 text-sm text-slate-600">Run an RCA before resuming. Deepa enters the PIN to turn it off.</p>
-          <div className="mt-3">
-            {can(actor, "resume") ? <ResumeForm /> : <p className="text-sm text-slate-600">{denial(actor, "resume")} Switch to Deepa to resume.</p>}
-          </div>
-        </>
+        <div className="border-l-4 border-tomato bg-tomato-wash p-4">
+          <p className="font-semibold text-tomato">ON since {killSwitch.tripped_at ? when(killSwitch.tripped_at) : "unknown"}</p>
+          <p className="mt-1 text-sm">{killSwitch.reason}</p>
+          <p className="mt-2 text-sm text-ink-soft">Run an RCA before resuming. Deepa enters the PIN to turn it off.</p>
+          <div className="mt-4">{can(actor, "resume") ? <ResumeForm /> : <p className="text-sm text-ink-soft">{denial(actor, "resume")} Switch to Deepa to resume.</p>}</div>
+        </div>
       ) : (
-        <p className="mt-2 text-sm text-slate-700">
-          Off. Runs and pushes are allowed.
-          {killSwitch.resumed_at && ` Last resumed by ${killSwitch.resumed_by} on ${when(killSwitch.resumed_at)}.`}
+        <p className="border-l-4 border-leaf bg-leaf-wash p-4">
+          <span className="font-semibold text-leaf-deep">Off.</span> Runs and pushes are allowed.
+          {killSwitch.resumed_at && <span className="text-ink-soft"> Last resumed by {killSwitch.resumed_by} on {when(killSwitch.resumed_at)}.</span>}
         </p>
       )}
-    </section>
+    </Section>
   );
 }
 
@@ -131,26 +138,26 @@ export default async function MonitorPage() {
     monitor = await loadMonitor(getDb(), getThresholds());
   } catch (err) {
     return (
-      <main className="mx-auto max-w-3xl p-8">
-        <h1 className="text-2xl font-semibold">Monitor</h1>
-        <p role="alert" className="mt-4 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800">
-          Could not load the monitor. Check DATABASE_URL in .env.local and that `npm run migrate` has run.
-          <span className="mt-1 block text-xs">{err instanceof Error ? err.message : String(err)}</span>
+      <main className="mx-auto max-w-3xl px-5 py-10">
+        <h1 className="text-[40px]">Monitor</h1>
+        <p role="alert" className="mt-4 border-l-4 border-tomato bg-tomato-wash p-4 text-sm">
+          <span className="font-semibold">Could not load the monitor.</span> Check DATABASE_URL in .env.local and that `npm run migrate` has run.
+          <span className="num mt-1 block text-xs text-ink-soft">{err instanceof Error ? err.message : String(err)}</span>
         </p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-[1080px] flex-col gap-8 px-5 pb-20 pt-5 sm:px-8">
       <Banners monitor={monitor} />
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Monitor</h1>
-        <NavLinks current="monitor" />
-      </header>
-      <RejectionCard monitor={monitor} />
-      <LossCard monitor={monitor} actor={actor} />
-      <KillSwitchCard monitor={monitor} actor={actor} />
+      <Masthead current="monitor" />
+      <div>
+        <h1 className="text-[40px] sm:text-[46px]">Monitor</h1>
+      </div>
+      <RejectionSection monitor={monitor} />
+      <LossSection monitor={monitor} actor={actor} />
+      <KillSwitchSection monitor={monitor} actor={actor} />
     </main>
   );
 }

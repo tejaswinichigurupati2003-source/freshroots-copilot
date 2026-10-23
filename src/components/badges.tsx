@@ -1,28 +1,37 @@
-const FLAGS: Record<string, { label: string; style: string }> = {
-  STOCKOUT_RISK: { label: "Stockout risk", style: "bg-red-100 text-red-800" },
-  OVERSTOCK_RISK: { label: "Overstock risk", style: "bg-amber-100 text-amber-800" },
-  HIGH_DEMAND: { label: "High demand", style: "bg-blue-100 text-blue-800" },
-  INSUFFICIENT_HISTORY: { label: "Not enough history", style: "bg-violet-100 text-violet-800" },
-  OK: { label: "OK", style: "bg-emerald-100 text-emerald-800" },
+/** Flag colours: [text and border, wash]. Produce palette from globals.css. */
+export const FLAG_TONES: Record<string, { label: string; ink: string; wash: string }> = {
+  STOCKOUT_RISK: { label: "Stockout", ink: "var(--color-tomato)", wash: "var(--color-tomato-wash)" },
+  OVERSTOCK_RISK: { label: "Overstock", ink: "var(--color-turmeric)", wash: "var(--color-turmeric-wash)" },
+  HIGH_DEMAND: { label: "High demand", ink: "var(--color-indigo)", wash: "var(--color-indigo-wash)" },
+  INSUFFICIENT_HISTORY: { label: "No history", ink: "var(--color-plum)", wash: "var(--color-plum-wash)" },
+  OK: { label: "OK", ink: "var(--color-leaf)", wash: "var(--color-leaf-wash)" },
 };
 
 const EDGE_LABELS: Record<string, string> = {
   NEW_LAUNCH: "New launch",
   DISTRIBUTOR_DROP: "Distributor drop",
   ONE_OFF_SPIKE: "One-off spike",
-  OTHER: "Other edge case",
+  OTHER: "Other",
 };
 
-const pill = "inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium";
-
+/** A stamped sticker for the rule outcome. */
 export function FlagBadge({ flag }: { flag: string }) {
-  const f = FLAGS[flag] ?? { label: flag, style: "bg-slate-100 text-slate-800" };
-  return <span className={`${pill} ${f.style}`}>{f.label}</span>;
+  const tone = FLAG_TONES[flag] ?? { label: flag, ink: "var(--color-ink-soft)", wash: "var(--color-card)" };
+  return (
+    <span className="tag" style={{ color: tone.ink, background: tone.wash }}>
+      <span aria-hidden className="inline-block h-1.5 w-1.5" style={{ background: tone.ink }} />
+      {tone.label}
+    </span>
+  );
 }
 
-/** Shows the LLM's classification, or a generic badge when only the code's signals fired. */
+/** Dashed outline, so an edge case reads as "look closer" and not as a second verdict. */
 export function EdgeBadge({ type, hasSignals }: { type: string | null; hasSignals: boolean }) {
-  const label = type && type !== "NONE" ? (EDGE_LABELS[type] ?? type) : hasSignals ? "Needs a look" : null;
+  const label = type && type !== "NONE" ? (EDGE_LABELS[type] ?? type) : hasSignals ? "Look closer" : null;
   if (!label) return null;
-  return <span className={`${pill} border border-fuchsia-300 bg-fuchsia-50 text-fuchsia-800`}>{label}</span>;
+  return (
+    <span className="tag" style={{ color: "var(--color-plum)", borderStyle: "dashed" }}>
+      {label}
+    </span>
+  );
 }

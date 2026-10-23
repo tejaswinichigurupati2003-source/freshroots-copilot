@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { finalQtyText, orderText } from "@/lib/approval/labels";
 import type { DashboardRow } from "@/lib/db/dashboard";
 import type { MonitorView } from "@/lib/db/monitor-store";
@@ -7,18 +8,19 @@ const when = (iso: string) => new Date(iso).toLocaleString("en-IN", { timeZone: 
 
 const CALL: Record<string, string> = { approved: "Approved", edited: "Changed quantity", rejected: "Rejected" };
 
-function Card({ label, value, note, tone = "plain" }: { label: string; value: string; note?: string; tone?: "plain" | "warn" | "bad" | "good" }) {
-  const tones = { plain: "border-slate-200", warn: "border-amber-300 bg-amber-50", bad: "border-red-300 bg-red-50", good: "border-emerald-300 bg-emerald-50" };
+function Figure({ label, value, note, tone }: { label: string; value: ReactNode; note?: string; tone?: string }) {
   return (
-    <div className={`rounded-lg border bg-white p-4 ${tones[tone]}`}>
-      <p className="text-xs uppercase tracking-wide text-slate-600">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-      {note && <p className="mt-1 text-xs text-slate-600">{note}</p>}
+    <div>
+      <p className="eyebrow">{label}</p>
+      <p className="mt-1 font-display text-[30px] leading-none" style={tone ? { color: tone } : undefined}>
+        {value}
+      </p>
+      {note && <p className="mt-1.5 text-[13px] text-ink-soft">{note}</p>}
     </div>
   );
 }
 
-/** Deepa's view: how Raghav is doing and whether the guardrails hold. Read only. */
+/** Deepa's view: how Raghav is deciding and where loss stands. Read only. */
 export function OversightPanel({ reviewRows, monitor }: { reviewRows: DashboardRow[]; monitor: MonitorView }) {
   const decided = reviewRows.filter((r) => r.decision);
   const waiting = reviewRows.length - decided.length;
@@ -26,59 +28,66 @@ export function OversightPanel({ reviewRows, monitor }: { reviewRows: DashboardR
   const changed = decided.filter((r) => r.decision?.action === "edited").length;
   const { rejection, latestActual, killSwitch, thresholds } = monitor;
 
-  const lossValue = latestActual ? `${Number(latestActual.total_loss_lakh)} lakh` : "None entered";
-  const lossTone = latestActual?.level === "stop" ? "bad" : latestActual?.level === "warn" ? "warn" : "plain";
+  const lossTone = latestActual?.level === "stop" ? "var(--color-tomato)" : latestActual?.level === "warn" ? "var(--color-turmeric)" : undefined;
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-2">
+    <section className="panel flex flex-col gap-5 p-5" aria-label="Oversight for Deepa">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Oversight for Deepa</h2>
-          <p className="text-sm text-slate-600">This view is read only. Raghav decides each line; you watch the guardrails.</p>
+          <p className="eyebrow">Read only</p>
+          <h2 className="mt-1 text-[26px]">Oversight</h2>
         </div>
-        <Link href="/monitor" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+        <Link href="/monitor" className="btn">
           Enter losses or resume the kill switch
         </Link>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card label="Waiting on Raghav" value={`${waiting} of ${reviewRows.length}`} note="Lines in this run not yet decided" tone={waiting > 0 ? "warn" : "good"} />
-        <Card label="Raghav's calls" value={`${decided.length - rejected} yes, ${rejected} no`} note={changed > 0 ? `${changed} with a changed quantity` : "No quantities changed"} />
-        <Card
-          label="Rejection rate (30 days)"
-          value={rejection.rate === null ? "Not measured" : `${Math.round(rejection.rate * 100)}%`}
-          note={rejection.rate === null ? `Needs ${monitor.minLines} decided lines, has ${rejection.decided}` : "Healthy is 15% to 30%. Warning above 50%."}
-          tone={rejection.warning ? "warn" : "plain"}
+      <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+        <Figure label="Waiting on Raghav" value={<span className="num">{waiting}</span>} note={`of ${reviewRows.length} lines in this run`} tone={waiting === 0 ? "var(--color-leaf)" : undefined} />
+        <Figure
+          label="Raghav's calls so far"
+          value={
+            <>
+              <span className="num">{decided.length - rejected}</span> <span className="text-[18px] text-ink-soft">yes</span> <span className="num">{rejected}</span> <span className="text-[18px] text-ink-soft">no</span>
+            </>
+          }
+          note={changed > 0 ? `${changed} with a changed quantity` : "No quantities changed"}
         />
-        <Card
+        <Figure
+          label="Rejection rate, 30 days"
+          value={rejection.rate === null ? <span className="text-[22px] italic text-ink-soft">not measured</span> : <span className="num">{Math.round(rejection.rate * 100)}%</span>}
+          note={rejection.rate === null ? `Needs ${monitor.minLines} decided lines, has ${rejection.decided}` : "Healthy is 15% to 30%. Warning above 50%."}
+          tone={rejection.warning ? "var(--color-turmeric)" : undefined}
+        />
+        <Figure
           label="Loss this quarter"
-          value={lossValue}
-          note={`Baseline ${thresholds.BASELINE_LOSS_LAKH}. Warning above ${thresholds.LOSS_WARN_LAKH}. Stop above ${thresholds.LOSS_STOP_LAKH}.`}
+          value={latestActual ? <span className="num">{Number(latestActual.total_loss_lakh)} lakh</span> : <span className="text-[22px] italic text-ink-soft">none entered</span>}
+          note={`Baseline ${thresholds.BASELINE_LOSS_LAKH}. Warn above ${thresholds.LOSS_WARN_LAKH}. Stop above ${thresholds.LOSS_STOP_LAKH}.`}
           tone={lossTone}
         />
       </div>
 
-      <div className={`rounded-lg border p-3 text-sm ${killSwitch.active ? "border-red-300 bg-red-50 text-red-800" : "border-emerald-300 bg-emerald-50 text-emerald-900"}`}>
-        Kill switch: <span className="font-semibold">{killSwitch.active ? "ON" : "off"}</span>
+      <p className="border-l-4 py-1.5 pl-3 text-sm" style={{ borderColor: killSwitch.active ? "var(--color-tomato)" : "var(--color-leaf)", background: killSwitch.active ? "var(--color-tomato-wash)" : "var(--color-leaf-wash)" }}>
+        Kill switch: <span className="font-bold">{killSwitch.active ? "ON" : "off"}</span>
         {killSwitch.active ? `. ${killSwitch.reason ?? ""}` : ". Runs and pushes are allowed."}
-      </div>
+      </p>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
+      <div className="overflow-x-auto">
+        <table className="ledger min-w-[640px]">
+          <thead>
             <tr>
-              <th className="px-3 py-2 font-medium">SKU</th>
-              <th className="px-3 py-2 font-medium">Raghav&rsquo;s call</th>
-              <th className="px-3 py-2 text-right font-medium">Recommended order</th>
-              <th className="px-3 py-2 text-right font-medium">Final</th>
-              <th className="px-3 py-2 font-medium">Reason</th>
-              <th className="px-3 py-2 font-medium">When (IST)</th>
+              <th>SKU</th>
+              <th>Raghav&rsquo;s call</th>
+              <th className="!text-right">Recommended</th>
+              <th className="!text-right">Final</th>
+              <th>Reason</th>
+              <th>When (IST)</th>
             </tr>
           </thead>
           <tbody>
             {decided.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-4 text-slate-600">
+                <td colSpan={6} className="italic text-ink-soft">
                   No decisions yet in this run.
                 </td>
               </tr>
@@ -86,15 +95,17 @@ export function OversightPanel({ reviewRows, monitor }: { reviewRows: DashboardR
             {[...decided]
               .sort((a, b) => (b.decision?.decided_at ?? "").localeCompare(a.decision?.decided_at ?? ""))
               .map((r) => (
-                <tr key={r.id} className="border-t border-slate-200 align-top">
-                  <td className="px-3 py-2">
-                    <span className="font-medium">{r.sku_id}</span> <span className="text-xs text-slate-600">{r.sku_name}</span>
+                <tr key={r.id}>
+                  <td className="!py-2.5">
+                    <span className="num text-[13px] font-medium">{r.sku_id}</span> <span className="text-[13px] text-ink-soft">{r.sku_name.replace(/^Freshroots /, "")}</span>
                   </td>
-                  <td className="px-3 py-2">{CALL[r.decision?.action ?? ""] ?? r.decision?.action}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{orderText(r.flag, r.recommended_qty)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.decision?.action === "rejected" ? "None" : finalQtyText(r.decision?.final_qty ?? 0)}</td>
-                  <td className="px-3 py-2 text-slate-700">{r.decision?.reason ?? ""}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600">{r.decision ? when(r.decision.decided_at) : ""}</td>
+                  <td className="!py-2.5 font-semibold" style={{ color: r.decision?.action === "rejected" ? "var(--color-tomato)" : "var(--color-leaf-deep)" }}>
+                    {CALL[r.decision?.action ?? ""] ?? r.decision?.action}
+                  </td>
+                  <td className="num !py-2.5 text-right text-[13px]">{orderText(r.flag, r.recommended_qty)}</td>
+                  <td className="num !py-2.5 text-right text-[13px]">{r.decision?.action === "rejected" ? "None" : finalQtyText(r.decision?.final_qty ?? 0)}</td>
+                  <td className="!py-2.5 italic text-ink-soft">{r.decision?.reason ?? ""}</td>
+                  <td className="num whitespace-nowrap !py-2.5 text-[12px] text-ink-soft">{r.decision ? when(r.decision.decided_at) : ""}</td>
                 </tr>
               ))}
           </tbody>
