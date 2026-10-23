@@ -27,7 +27,7 @@ function fakeZoho(routes: (url: URL, method: string) => unknown) {
 
 describe("ZohoGateway", () => {
   it("refreshes the token on the India accounts server and sends it as Zoho-oauthtoken", async () => {
-    const { fetchFn, calls } = fakeZoho(() => ({ code: 0, message: "success", purchase_order: { purchaseorder_id: 1, purchaseorder_number: "PO-00007" } }));
+    const { fetchFn, calls } = fakeZoho(() => ({ code: 0, message: "success", purchaseorder: { purchaseorder_id: 1, purchaseorder_number: "PO-00007" } }));
     const gateway = new ZohoGateway(config, map, fetchFn);
     const result = await gateway.createDraftPurchaseOrder({ runId: "run-1", distributorId: "DIST001", lines: [{ recommendationId: "r", skuId: "SKU001", skuName: "Mango", quantity: 750 }] });
 
@@ -37,6 +37,12 @@ describe("ZohoGateway", () => {
     expect(calls[1].headers.Authorization).toBe("Zoho-oauthtoken tok");
     expect(JSON.parse(calls[1].body!)).toMatchObject({ vendor_id: "V1", line_items: [{ item_id: "I1", quantity: 750 }] });
     expect(result.externalId).toBe("PO-00007");
+  });
+
+  it("also accepts the docs' purchase_order spelling", async () => {
+    const { fetchFn } = fakeZoho(() => ({ code: 0, message: "success", purchase_order: { purchaseorder_id: 2, purchaseorder_number: "PO-00008" } }));
+    const result = await new ZohoGateway(config, map, fetchFn).createDraftPurchaseOrder({ runId: "r", distributorId: "DIST001", lines: [{ recommendationId: "x", skuId: "SKU001", skuName: "?", quantity: 1 }] });
+    expect(result.externalId).toBe("PO-00008");
   });
 
   it("reuses the access token between calls", async () => {

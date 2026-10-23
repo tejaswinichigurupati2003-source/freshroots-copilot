@@ -38,10 +38,13 @@ const OPEN_STATUSES = new Set(["open", "issued", "partially_received"]);
 const PAGE_SIZE = 200;
 
 const tokenSchema = z.object({ access_token: z.string(), expires_in: z.number().optional() });
+const createdOrder = z.object({ purchaseorder_id: z.union([z.string(), z.number()]), purchaseorder_number: z.string() });
+// The docs example calls the object purchase_order; the live API returns purchaseorder. Accept both.
 const createSchema = z.object({
   code: z.number(),
   message: z.string(),
-  purchase_order: z.object({ purchaseorder_id: z.union([z.string(), z.number()]), purchaseorder_number: z.string() }).optional(),
+  purchaseorder: createdOrder.optional(),
+  purchase_order: createdOrder.optional(),
 });
 const listSchema = z.object({
   code: z.number(),
@@ -133,9 +136,10 @@ export class ZohoGateway implements PurchaseOrderGateway {
       notes: `Draft created by the Freshroots Demand Planning Copilot after approval. Run ${po.runId}.`,
     });
     const parsed = createSchema.parse(json);
-    if (parsed.code !== 0 || !parsed.purchase_order) throw new Error(`Zoho refused the purchase order: ${parsed.message}`);
+    const order = parsed.purchaseorder ?? parsed.purchase_order;
+    if (parsed.code !== 0 || !order) throw new Error(`Zoho refused the purchase order: ${parsed.message}`);
 
-    return { externalId: parsed.purchase_order.purchaseorder_number, response: parsed as unknown as Record<string, unknown> };
+    return { externalId: order.purchaseorder_number, response: parsed as unknown as Record<string, unknown> };
   }
 
   async listOpenPurchaseOrders(): Promise<OpenPoLine[]> {

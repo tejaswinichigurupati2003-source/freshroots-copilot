@@ -107,7 +107,11 @@ Mock mode is the default and needs nothing. For live mode:
 4. Run `npm run zoho:check` to confirm the connection.
 5. Set `ZOHO_MODE=live`.
 
-Status of this build: steps 1 and 2 were done and the token works, but Zoho refused to create an organization for the (brand new) account, both on the sign-up page and through the API ("Action cannot be completed", code 6063). So steps 3 to 5 are not done and the live path has only been tested against a fake server. Re-running `npm run zoho:setup` later needs no new code.
+Status of this build: steps 1 to 4 are done against a real Zoho Inventory account (India data centre). `zoho:setup` created the organization, 4 vendors and 18 items, and a draft purchase order created through the live gateway was accepted by Zoho. `ZOHO_MODE` is still `mock` by default.
+
+Two things to know before switching to `live`:
+- In live mode each run replaces the `open_pos` table with the open POs in Zoho. A new Zoho organization has none, so the seed's five open POs (which drive rubric cases T3, T4 and T8) disappear and those SKUs will flag differently. Create and issue matching POs in Zoho first if you want the same results.
+- A SKU whose distributor has no vendor in `data/zoho_map.csv` cannot be pushed. The push reports the missing vendor and leaves the line approved.
 
 More detail is in [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md). The walkthrough for the demo is [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
