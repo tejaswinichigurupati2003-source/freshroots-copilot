@@ -116,7 +116,7 @@ export async function runPipeline(
   try {
     const killSwitch = await store.getKillSwitch();
     if (killSwitch.active) {
-      return await stop("kill_switch", `Kill switch is on${killSwitch.reason ? `: ${killSwitch.reason}` : ""}. Runs are paused until it is resumed.`);
+      return await stop("kill_switch", `Kill switch is on${killSwitch.reason ? `: ${killSwitch.reason.replace(/\.$/, "")}` : ""}. Runs are paused until it is resumed.`);
     }
 
     // Runs after the kill switch check so a paused system never calls Zoho. Live mode copies Zoho's open POs here.

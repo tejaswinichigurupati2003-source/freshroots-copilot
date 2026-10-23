@@ -1,16 +1,17 @@
 import { Banners, NavLinks } from "@/components/banners";
-import { ActingAsSelect } from "@/components/acting-as-select";
 import { EdgeBadge, FlagBadge } from "@/components/badges";
+import { OversightPanel } from "@/components/oversight";
 import { PushButton } from "@/components/push-button";
 import { RowActions } from "@/components/row-actions";
 import { RunNowButton } from "@/components/run-now-button";
 import { Sparkline } from "@/components/sparkline";
+import { can } from "@/lib/approval/roles";
 import { needsReview, sortForReview } from "@/lib/approval/review";
 import { getDb } from "@/lib/db/client";
 import { loadMonitor, type MonitorView } from "@/lib/db/monitor-store";
 import { getThresholds } from "@/lib/monitor/types";
 import { loadDashboard, type Dashboard, type DashboardRow } from "@/lib/db/dashboard";
-import { getActingAs } from "./actions";
+import { getActingAs } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ function trend(row: DashboardRow): number[] {
   return weeks.map((w) => w.units);
 }
 
-function DecisionCell({ row }: { row: DashboardRow }) {
+function DecisionCell({ row, canDecide }: { row: DashboardRow; canDecide: boolean }) {
   if (row.decision) {
     const d = row.decision;
     return (
@@ -37,20 +38,23 @@ function DecisionCell({ row }: { row: DashboardRow }) {
         </p>
         {d.reason && <p className="mt-0.5 italic">&ldquo;{d.reason}&rdquo;</p>}
         {row.status === "pushed" && <p className="mt-0.5 font-medium text-emerald-800">Sent to Zoho as a draft PO</p>}
-        <div className="mt-2 flex gap-1.5 opacity-50">
-          {["Approve", "Edit quantity", "Reject"].map((label) => (
-            <button key={label} disabled className="rounded-md border border-slate-300 px-2.5 py-1 text-xs">
-              {label}
-            </button>
-          ))}
-        </div>
+        {canDecide && (
+          <div className="mt-2 flex gap-1.5 opacity-50">
+            {["Approve", "Edit quantity", "Reject"].map((label) => (
+              <button key={label} disabled className="rounded-md border border-slate-300 px-2.5 py-1 text-xs">
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
+  if (!canDecide) return <span className="text-xs text-slate-500">Waiting for Raghav</span>;
   return <RowActions recommendationId={row.id} recommendedQty={row.recommended_qty} />;
 }
 
-function RecommendationRow({ row }: { row: DashboardRow }) {
+function RecommendationRow({ row, canDecide }: { row: DashboardRow; canDecide: boolean }) {
   const hasSignals = Boolean(row.signals.shortHistory || row.signals.recentDrop || row.signals.oneWeekSpike);
   return (
     <tr className="border-t border-slate-200 align-top">
@@ -74,7 +78,7 @@ function RecommendationRow({ row }: { row: DashboardRow }) {
         {row.evidence && <p className="mt-1 text-xs text-slate-600">{row.evidence}</p>}
       </td>
       <td className="px-3 py-3">
-        {needsReview(row) ? <DecisionCell row={row} /> : <span className="text-xs text-slate-500">No approval needed</span>}
+        {needsReview(row) ? <DecisionCell row={row} canDecide={canDecide} /> : <span className="text-xs text-slate-500">No approval needed</span>}
       </td>
     </tr>
   );
@@ -82,7 +86,7 @@ function RecommendationRow({ row }: { row: DashboardRow }) {
 
 const headers = ["SKU", "Flag", "Recommended qty", "Weeks of cover", "12-week sales", "Why", "Decision"];
 
-function Table({ rows }: { rows: DashboardRow[] }) {
+function Table({ rows, canDecide }: { rows: DashboardRow[]; canDecide: boolean }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table className="w-full text-left text-sm">
@@ -97,7 +101,7 @@ function Table({ rows }: { rows: DashboardRow[] }) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <RecommendationRow key={row.id} row={row} />
+            <RecommendationRow key={row.id} row={row} canDecide={canDecide} />
           ))}
         </tbody>
       </table>
@@ -105,7 +109,7 @@ function Table({ rows }: { rows: DashboardRow[] }) {
   );
 }
 
-function Header({ data, actor }: { data: Dashboard; actor: Awaited<ReturnType<typeof getActingAs>> }) {
+function Header({ data, canRun }: { data: Dashboard; canRun: boolean }) {
   const { shownRun, latestRun, stockAsOf } = data;
   return (
     <header className="flex flex-wrap items-start justify-between gap-4">
@@ -126,10 +130,7 @@ function Header({ data, actor }: { data: Dashboard; actor: Awaited<ReturnType<ty
           )}
         </p>
       </div>
-      <div className="flex flex-col items-end gap-3">
-        <ActingAsSelect current={actor} />
-        <RunNowButton />
-      </div>
+      {canRun ? <RunNowButton /> : <p className="max-w-xs text-right text-xs text-slate-500">Only Raghav starts a run. Runs also happen on their own every Monday and Thursday.</p>}
     </header>
   );
 }
@@ -158,35 +159,40 @@ export default async function Home() {
   const quiet = sorted.filter((r) => !needsReview(r));
   const decided = review.filter((r) => r.decision).length;
   const readyToPush = review.filter((r) => r.status === "approved" && r.decision && r.decision.final_qty > 0).length;
+  const canDecide = can(actor, "decide");
   const zohoMode = process.env.ZOHO_MODE?.trim().toLowerCase() === "live" ? "live" : "mock";
 
   return (
     <main className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
       <Banners monitor={monitor} />
 
-      <Header data={data} actor={actor} />
+      <Header data={data} canRun={can(actor, "run")} />
 
       {data.shownRun && (
         <>
+          {actor === "Deepa" && <OversightPanel reviewRows={review} monitor={monitor} />}
+
           <section className="flex flex-col gap-2">
             <h2 className="text-lg font-semibold">
-              Needs your decision{" "}
+              {canDecide ? "Needs your decision" : "Lines Raghav is deciding"}{" "}
               <span className="text-sm font-normal text-slate-600">
                 ({decided} of {review.length} decided)
               </span>
             </h2>
-            {review.length > 0 ? <Table rows={review} /> : <p className="text-sm text-slate-600">Nothing needs a decision in this run.</p>}
+            {review.length > 0 ? <Table rows={review} canDecide={canDecide} /> : <p className="text-sm text-slate-600">Nothing needs a decision in this run.</p>}
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <PushButton readyLines={readyToPush} mode={zohoMode} blocked={monitor.killSwitch.active} />
-          </section>
+          {can(actor, "push") && (
+            <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <PushButton readyLines={readyToPush} mode={zohoMode} blocked={monitor.killSwitch.active} />
+            </section>
+          )}
 
           <details className="rounded-lg border border-slate-200 bg-white p-4">
             <summary className="cursor-pointer text-sm font-medium">
               {quiet.length} SKUs are OK and need no approval
             </summary>
-            <div className="mt-3">{quiet.length > 0 && <Table rows={quiet} />}</div>
+            <div className="mt-3">{quiet.length > 0 && <Table rows={quiet} canDecide={canDecide} />}</div>
           </details>
         </>
       )}

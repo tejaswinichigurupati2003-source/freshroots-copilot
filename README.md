@@ -97,10 +97,22 @@ npm run run:pipeline   # a real run against Postgres, compared with the answer k
 - **Invented data:** `open_pos_seed.csv`, `sku_economics_seed.csv`, `baseline_losses_seed.csv`, `raghav_past_recommendations_seed.csv`, and the three edge-case SKUs (SKU016 to SKU018) in the merged files.
 - **Proposed, not from the case:** the 25% loss-reduction target, the 40 and 50 lakh thresholds, and the 15 to 30% healthy rejection range.
 
+## Switching Zoho to live
+
+Mock mode is the default and needs nothing. For live mode:
+
+1. In the [Zoho API Console](https://api-console.zoho.in) (use the data centre of your account), create a **Self Client**. Put its id and secret in `.env.local` as `ZOHO_CLIENT_ID` and `ZOHO_CLIENT_SECRET`, and set `ZOHO_DC` (`in` for India).
+2. On its **Generate Code** tab, create a code with these scopes: `ZohoInventory.settings.CREATE,ZohoInventory.settings.READ,ZohoInventory.purchaseorders.CREATE,ZohoInventory.purchaseorders.READ,ZohoInventory.contacts.CREATE,ZohoInventory.contacts.READ,ZohoInventory.items.CREATE,ZohoInventory.items.READ`. Then run `npm run zoho:token -- <code>` within 3 minutes. It saves `ZOHO_REFRESH_TOKEN` without printing it.
+3. Run `npm run zoho:setup`. It creates the Zoho Inventory organization if the account has none, then one vendor per distributor and one item per SKU (skipping any that exist), saves `ZOHO_ORG_ID`, and writes `data/zoho_map.csv`. It is safe to run again.
+4. Run `npm run zoho:check` to confirm the connection.
+5. Set `ZOHO_MODE=live`.
+
+Status of this build: steps 1 and 2 were done and the token works, but Zoho refused to create an organization for the (brand new) account, both on the sign-up page and through the API ("Action cannot be completed", code 6063). So steps 3 to 5 are not done and the live path has only been tested against a fake server. Re-running `npm run zoho:setup` later needs no new code.
+
 More detail is in [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md). The walkthrough for the demo is [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 ## Known limits
 
-- "Acting as" (Raghav or Deepa) is a cookie, not a login.
+- "Acting as" (Raghav or Deepa) is a cookie, not a login. It is shown on every page and decides what you can do: Raghav runs the forecast, decides lines and sends orders to Zoho; Deepa sees a read-only oversight view and alone can enter quarterly losses and resume the kill switch. The server refuses anything outside the chosen role.
 - The Run now button can take up to a minute when Gemini is on, because calls are paced for free-tier limits.
 - Only the latest completed run is shown. Lines left undecided in an older run are not pushed.

@@ -77,7 +77,7 @@ export async function pushApproved(actor: string, deps: { store: PushStore; gate
 
   const killSwitch = await store.getKillSwitch();
   if (killSwitch.active) {
-    const message = `Kill switch is on${killSwitch.reason ? `: ${killSwitch.reason}` : ""}. Nothing was sent to Zoho.`;
+    const message = `Kill switch is on${killSwitch.reason ? `: ${killSwitch.reason.replace(/\.$/, "")}` : ""}. Nothing was sent to Zoho.`;
     await store.audit({ actor, action: "zoho_push_blocked", details: { reason: "kill_switch" } });
     return { status: "blocked", message };
   }

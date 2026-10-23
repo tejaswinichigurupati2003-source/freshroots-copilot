@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AuditEntry } from "../ingest/pipeline";
+import { can, denial } from "./roles";
 import { needsReview } from "./review";
 
 export const ACTORS = ["Raghav", "Deepa"] as const;
@@ -55,6 +56,7 @@ export async function decide(store: DecisionStore, raw: DecisionInput): Promise<
   const parsed = baseSchema.safeParse(raw);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
   const input = parsed.data;
+  if (!can(input.actor, "decide")) return fail(denial(input.actor, "decide"));
 
   let editedQty: number | null = null;
   if (input.action === "edit") {

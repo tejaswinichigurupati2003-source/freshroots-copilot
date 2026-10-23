@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { MonitorView } from "@/lib/db/monitor-store";
+import { getActingAs } from "@/lib/session";
+import { ActingAsSelect } from "./acting-as-select";
 
 /** Kill switch (red), loss warning (amber) and rejection early warning (amber). Shown on every page. */
 export function Banners({ monitor }: { monitor: MonitorView }) {
@@ -35,17 +37,22 @@ export function Banners({ monitor }: { monitor: MonitorView }) {
   );
 }
 
-export function NavLinks({ current }: { current: "dashboard" | "monitor" | "audit" }) {
+/** Page links plus the "Acting as" selector, so the choice is visible and changeable on every page. */
+export async function NavLinks({ current }: { current: "dashboard" | "monitor" | "audit" }) {
+  const actor = await getActingAs();
   const link = (href: string, label: string, active: boolean) => (
     <Link href={href} className={active ? "font-semibold underline" : "text-slate-600 hover:underline"}>
       {label}
     </Link>
   );
   return (
-    <nav className="flex gap-4 text-sm">
-      {link("/", "Recommendations", current === "dashboard")}
-      {link("/monitor", "Monitor", current === "monitor")}
-      {link("/audit", "Audit log", current === "audit")}
-    </nav>
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+      <nav className="flex gap-4 text-sm">
+        {link("/", "Recommendations", current === "dashboard")}
+        {link("/monitor", "Monitor", current === "monitor")}
+        {link("/audit", "Audit log", current === "audit")}
+      </nav>
+      <ActingAsSelect current={actor} />
+    </div>
   );
 }

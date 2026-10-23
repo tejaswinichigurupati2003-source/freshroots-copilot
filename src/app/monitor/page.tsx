@@ -1,9 +1,12 @@
 import { Banners, NavLinks } from "@/components/banners";
 import { LossForm, ResumeForm } from "@/components/monitor-forms";
+import { can, denial } from "@/lib/approval/roles";
+import type { Actor } from "@/lib/approval/decide";
 import { getDb } from "@/lib/db/client";
 import { loadMonitor, type MonitorView } from "@/lib/db/monitor-store";
 import { getThresholds } from "@/lib/monitor/types";
 import { ROLLING_DAYS } from "@/lib/monitor/rejection";
+import { getActingAs } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +37,7 @@ function RejectionCard({ monitor }: { monitor: MonitorView }) {
   );
 }
 
-function LossCard({ monitor }: { monitor: MonitorView }) {
+function LossCard({ monitor, actor }: { monitor: MonitorView; actor: Actor }) {
   const { latestActual, thresholds, losses } = monitor;
   const baseline = thresholds.BASELINE_LOSS_LAKH;
   const target = Math.round(baseline * 0.75 * 100) / 100;
@@ -67,7 +70,7 @@ function LossCard({ monitor }: { monitor: MonitorView }) {
 
       <h3 className="mt-5 text-sm font-semibold">Enter a quarter&rsquo;s actual loss</h3>
       <div className="mt-2">
-        <LossForm />
+        {can(actor, "enter_loss") ? <LossForm /> : <p className="text-sm text-slate-600">{denial(actor, "enter_loss")} Switch to Deepa to enter a figure.</p>}
       </div>
 
       <table className="mt-5 w-full text-left text-sm">
@@ -96,7 +99,7 @@ function LossCard({ monitor }: { monitor: MonitorView }) {
   );
 }
 
-function KillSwitchCard({ monitor }: { monitor: MonitorView }) {
+function KillSwitchCard({ monitor, actor }: { monitor: MonitorView; actor: Actor }) {
   const { killSwitch } = monitor;
   return (
     <section className={card}>
@@ -106,9 +109,9 @@ function KillSwitchCard({ monitor }: { monitor: MonitorView }) {
           <p className="mt-2 text-sm font-medium text-red-700">
             ON since {killSwitch.tripped_at ? when(killSwitch.tripped_at) : "unknown"}. {killSwitch.reason}
           </p>
-          <p className="mt-1 text-sm text-slate-600">Run an RCA before resuming. Enter the PIN to turn it off.</p>
+          <p className="mt-1 text-sm text-slate-600">Run an RCA before resuming. Deepa enters the PIN to turn it off.</p>
           <div className="mt-3">
-            <ResumeForm />
+            {can(actor, "resume") ? <ResumeForm /> : <p className="text-sm text-slate-600">{denial(actor, "resume")} Switch to Deepa to resume.</p>}
           </div>
         </>
       ) : (
@@ -122,6 +125,7 @@ function KillSwitchCard({ monitor }: { monitor: MonitorView }) {
 }
 
 export default async function MonitorPage() {
+  const actor = await getActingAs();
   let monitor: MonitorView;
   try {
     monitor = await loadMonitor(getDb(), getThresholds());
@@ -145,8 +149,8 @@ export default async function MonitorPage() {
         <NavLinks current="monitor" />
       </header>
       <RejectionCard monitor={monitor} />
-      <LossCard monitor={monitor} />
-      <KillSwitchCard monitor={monitor} />
+      <LossCard monitor={monitor} actor={actor} />
+      <KillSwitchCard monitor={monitor} actor={actor} />
     </main>
   );
 }

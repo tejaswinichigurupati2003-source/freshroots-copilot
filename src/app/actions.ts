@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { ACTORS, decide, type Actor } from "@/lib/approval/decide";
+import { ACTORS, decide } from "@/lib/approval/decide";
+import { can, denial } from "@/lib/approval/roles";
 import { getDb } from "@/lib/db/client";
 import { DbDecisionStore } from "@/lib/db/decision-store";
 import { DbMonitorStore } from "@/lib/db/monitor-store";
@@ -11,6 +12,7 @@ import { resumeKillSwitch } from "@/lib/monitor/kill-switch";
 import { recordLoss } from "@/lib/monitor/loss";
 import { checkRejectionWarning } from "@/lib/monitor/rejection";
 import { getThresholds } from "@/lib/monitor/types";
+import { ACTING_AS_COOKIE, getActingAs } from "@/lib/session";
 import { createGateway } from "@/lib/zoho/factory";
 import { pushApproved } from "@/lib/zoho/push";
 
@@ -19,20 +21,12 @@ export interface DecisionState {
   message?: string;
 }
 
-const ACTING_AS_COOKIE = "acting_as";
-
-/** Who is using the dashboard. A cookie stands in for real login. */
-export async function getActingAs(): Promise<Actor> {
-  const value = (await cookies()).get(ACTING_AS_COOKIE)?.value;
-  return ACTORS.find((a) => a === value) ?? "Raghav";
-}
-
-export async function setActingAs(formData: FormData) {
-  const value = formData.get("actor");
-  if (ACTORS.some((a) => a === value)) {
-    (await cookies()).set(ACTING_AS_COOKIE, String(value), { path: "/", sameSite: "lax", httpOnly: true });
+export async function setActingAs(actor: string) {
+  if (ACTORS.some((a) => a === actor)) {
+    (await cookies()).set(ACTING_AS_COOKIE, actor, { path: "/", sameSite: "lax", httpOnly: true });
   }
-  revalidatePath("/");
+  // Every page shows the selector and role-specific content, so refresh them all.
+  revalidatePath("/", "layout");
 }
 
 export async function decideAction(_previous: DecisionState, formData: FormData): Promise<DecisionState> {
@@ -58,7 +52,9 @@ export async function decideAction(_previous: DecisionState, formData: FormData)
 
 export async function pushToZoho(): Promise<DecisionState> {
   try {
-    const result = await pushApproved(await getActingAs(), { store: new DbPushStore(getDb()), gateway: createGateway() });
+    const actor = await getActingAs();
+    if (!can(actor, "push")) return { error: denial(actor, "push") };
+    const result = await pushApproved(actor, { store: new DbPushStore(getDb()), gateway: createGateway() });
     revalidatePath("/");
     if (result.status === "blocked") return { error: result.message };
 
@@ -79,9 +75,11 @@ export async function pushToZoho(): Promise<DecisionState> {
 
 export async function submitLoss(_previous: DecisionState, formData: FormData): Promise<DecisionState> {
   const field = (name: string) => String(formData.get(name) ?? "");
+  const actor = await getActingAs();
+  if (!can(actor, "enter_loss")) return { error: denial(actor, "enter_loss") };
   const result = await recordLoss(
     new DbMonitorStore(getDb()),
-    { period: field("period"), stockoutLakh: field("stockoutLakh"), overstockLakh: field("overstockLakh"), actor: await getActingAs() },
+    { period: field("period"), stockoutLakh: field("stockoutLakh"), overstockLakh: field("overstockLakh"), actor },
     getThresholds(),
     new Date(),
   );
@@ -91,9 +89,11 @@ export async function submitLoss(_previous: DecisionState, formData: FormData): 
 }
 
 export async function resumeAction(_previous: DecisionState, formData: FormData): Promise<DecisionState> {
+  const actor = await getActingAs();
+  if (!can(actor, "resume")) return { error: denial(actor, "resume") };
   const result = await resumeKillSwitch(
     new DbMonitorStore(getDb()),
-    { pin: String(formData.get("pin") ?? ""), actor: await getActingAs() },
+    { pin: String(formData.get("pin") ?? ""), actor },
     process.env.KILL_SWITCH_PIN,
     new Date(),
   );

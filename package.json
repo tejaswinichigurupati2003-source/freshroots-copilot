@@ -13,6 +13,9 @@
     "explain:demo": "tsx scripts/explain-demo.ts",
     "rubric": "tsx scripts/rubric.ts",
     "migrate": "tsx scripts/migrate.ts",
+    "zoho:token": "tsx scripts/zoho-token.ts",
+    "zoho:check": "tsx scripts/zoho-check.ts",
+    "zoho:setup": "tsx scripts/zoho-setup.ts",
     "seed:dry": "tsx scripts/seed.ts --dry"
   },
   "dependencies": {

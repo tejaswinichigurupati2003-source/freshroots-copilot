@@ -21,6 +21,7 @@ Weeks of cover is effective stock divided by the 12-week average weekly sales, t
 - **Edge-case signals are computed by code:** under 12 weeks of history; the last 4 weeks at least 25% below the 12-week average while the flag is OK; one week above 2.5 times the 12-week median.
 - **Drafts are not stock.** In live mode, only open, issued and partially received Zoho POs count as stock on the way.
 - **Stock freshness** uses the oldest per-SKU latest stock date. Runs are blocked when it is more than 7 days before the run date.
+- **Roles are ours.** The case names Raghav (planner) and Deepa (head). We gave Raghav the run, the line decisions and the Zoho push, and Deepa the loss entry and the kill-switch resume (the rubric says resume only with Deepa's PIN). Deepa's dashboard is read only.
 - **Rejecting saves a final quantity of 0.** Editing to the same quantity is recorded as an approval.
 - **The rejection rate** counts decided lines in the last 30 days and is measured only from 20 decided lines. `REJECTION_MIN_LINES` can lower this for demos.
 

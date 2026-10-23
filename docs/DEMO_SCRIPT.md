@@ -6,7 +6,7 @@
 - `.env.local` has `RUN_AS_OF=2026-10-19`, `KILL_SWITCH_PIN` set to a PIN you remember, and `ZOHO_MODE=mock`.
 - For a short demo, set `REJECTION_MIN_LINES=5` so the early warning can fire with a few decisions. The real default is 20.
 - If you re-run the demo, the kill switch must be off and you will see decisions from earlier runs. Start from a fresh Neon branch or database, or run the checks below in a new run.
-- Start the app with `npm run dev` and open http://localhost:3000. Set **Acting as** to Raghav.
+- Start the app with `npm run dev` and open http://localhost:3000. Set **Acting as** to Raghav (the planner). Raghav runs the forecast, decides each line and sends orders. Deepa has a read-only oversight view and is the only one who can enter losses or resume the kill switch.
 
 ## Walkthrough
 
@@ -32,10 +32,10 @@ Press **Send approved to Zoho**. The message lists draft POs per distributor. SK
 Run again, then reject most of the lines with short reasons (at least 5 characters each) until more than half of the decided lines are rejections. The amber banner appears: "Early warning: ... of recent recommendations were rejected." The system keeps running.
 
 **8. Kill switch above 50 lakh (3:45)**
-Open **Monitor**. Enter quarter "Oct-Dec 2026", stockout 32 and overstock 20 (52 lakh) and press **Save loss**. The red banner appears. Go back to the dashboard, press **Run now**, and see it refuse. Press **Send approved to Zoho** and see it blocked.
+Set **Acting as** to Deepa. The dashboard becomes her read-only oversight view (waiting lines, Raghav's calls, rejection rate, loss, kill switch). Open **Monitor**. Enter quarter "Oct-Dec 2026", stockout 32 and overstock 20 (52 lakh) and press **Save loss**. The red banner appears. Switch back to Raghav, press **Run now**, and see it refuse. Press **Send approved to Zoho** and see it blocked.
 
 **9. Resume with the PIN (4:15)**
-On **Monitor**, enter a wrong PIN: "Wrong PIN." Then the right PIN: the switch turns off. The card shows who resumed it and when. Set **Acting as** to Deepa first if you want her name recorded.
+On **Monitor**, enter a wrong PIN: "Wrong PIN." Then the right PIN: the switch turns off. The card shows who resumed it and when. Do this as Deepa, so her name is recorded. As Raghav the form is replaced by a note saying only Deepa can resume.
 
 **10. Audit log (4:45)**
 Open **Audit log**. Show the decisions with who and when, the push, the loss entry, the kill switch trip, the failed and successful resume.

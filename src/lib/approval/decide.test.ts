@@ -44,8 +44,8 @@ describe("decide", () => {
 
   it("records an edited quantity with the original kept", async () => {
     const { store, saved } = memoryStore(rec());
-    await decide(store, { ...input, actor: "Deepa", action: "edit", quantity: "600" });
-    expect(saved[0].decision).toMatchObject({ action: "edited", original_qty: 750, final_qty: 600, decided_by: "Deepa" });
+    await decide(store, { ...input, action: "edit", quantity: "600" });
+    expect(saved[0].decision).toMatchObject({ action: "edited", original_qty: 750, final_qty: 600, decided_by: "Raghav" });
   });
 
   it("treats an edit to the same quantity as an approval", async () => {
@@ -97,6 +97,14 @@ describe("decide", () => {
 
     const edge = memoryStore(rec({ flag: "OK", recommended_qty: 0, signals: { recentDrop: true } }));
     expect((await decide(edge.store, { ...input, action: "approve" })).ok).toBe(true);
+  });
+
+  it("refuses decisions from Deepa, who has an oversight role", async () => {
+    const { store, saved, audit } = memoryStore(rec());
+    const result = await decide(store, { ...input, actor: "Deepa", action: "approve" });
+    expect(result).toEqual({ ok: false, error: "Only Raghav can approve, edit or reject lines. You are acting as Deepa." });
+    expect(saved).toHaveLength(0);
+    expect(audit).toHaveLength(0);
   });
 
   it("requires a known actor", async () => {
