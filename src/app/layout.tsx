@@ -1,10 +1,11 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Schibsted_Grotesk, Spline_Sans_Mono, Young_Serif } from "next/font/google";
+import { Albert_Sans, Gabarito, Spline_Sans_Mono } from "next/font/google";
 import type { ReactNode } from "react";
+import { AppShell } from "@/components/app-shell";
 
-const display = Young_Serif({ weight: "400", subsets: ["latin"], variable: "--nf-display" });
-const body = Schibsted_Grotesk({ subsets: ["latin"], variable: "--nf-body" });
+const display = Gabarito({ weight: ["500", "600", "700"], subsets: ["latin"], variable: "--nf-display" });
+const body = Albert_Sans({ subsets: ["latin"], variable: "--nf-body" });
 const data = Spline_Sans_Mono({ subsets: ["latin"], variable: "--nf-data" });
 
 export const metadata: Metadata = {
@@ -15,7 +16,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${data.variable}`}>
-      <body>{children}</body>
+      <body>
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   );
 }

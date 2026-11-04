@@ -8,12 +8,12 @@ function Feedback({ state }: { state: DecisionState }) {
   return (
     <>
       {state.error && (
-        <p role="alert" className="border-l-2 border-tomato pl-2 text-sm font-semibold text-tomato">
+        <p role="alert" className="rounded-xl bg-tomato-wash px-3 py-2 text-sm font-semibold text-tomato">
           {state.error}
         </p>
       )}
       {state.message && (
-        <p role="status" className="border-l-2 border-leaf pl-2 text-sm font-semibold text-leaf-deep">
+        <p role="status" className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-leaf-deep">
           {state.message}
         </p>
       )}

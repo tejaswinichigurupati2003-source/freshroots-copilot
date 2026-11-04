@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Masthead } from "@/components/banners";
 import { getDb } from "@/lib/db/client";
 
 export const metadata: Metadata = { title: "Audit log" };
@@ -32,18 +31,17 @@ export default async function AuditPage() {
   const result = await loadAudit();
 
   return (
-    <main className="mx-auto flex max-w-[1280px] flex-col gap-7 px-5 pb-20 pt-5 sm:px-8">
-      <Masthead current="audit" />
+    <div className="flex flex-col gap-5">
       <div>
-        <p className="eyebrow">Every decision and system action, newest first</p>
-        <h1 className="mt-1 text-[40px] sm:text-[46px]">Audit log</h1>
+        <h1 className="text-[32px] sm:text-[38px]">Audit log</h1>
+        <p className="mt-1.5 text-ink-soft">Every decision and system action, newest first.</p>
       </div>
       {"error" in result ? (
-        <p role="alert" className="border-l-4 border-tomato bg-tomato-wash p-4 text-sm">
+        <p role="alert" className="rounded-2xl bg-tomato-wash p-4 text-sm">
           <span className="font-semibold">Could not load the audit log.</span> <span className="num text-xs text-ink-soft">{result.error}</span>
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <section className="card overflow-x-auto p-5">
           <table className="ledger min-w-[760px]">
             <thead>
               <tr>
@@ -56,16 +54,16 @@ export default async function AuditPage() {
             <tbody>
               {result.rows.map((row) => (
                 <tr key={row.id}>
-                  <td className="num whitespace-nowrap !py-2.5 text-[13px] text-ink-soft">{when(row.at)}</td>
-                  <td className="!py-2.5 font-semibold">{row.actor}</td>
-                  <td className="!py-2.5">{words(row.action)}</td>
-                  <td className="num !py-2.5 text-[12px] leading-snug text-ink-soft">{Object.keys(row.details).length ? JSON.stringify(row.details) : ""}</td>
+                  <td className="num whitespace-nowrap !py-3 text-[13px] text-ink-soft">{when(row.at)}</td>
+                  <td className="!py-3 font-semibold">{row.actor}</td>
+                  <td className="!py-3">{words(row.action)}</td>
+                  <td className="num !py-3 text-[12px] leading-snug text-ink-soft">{Object.keys(row.details).length ? JSON.stringify(row.details) : ""}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </section>
       )}
-    </main>
+    </div>
   );
 }

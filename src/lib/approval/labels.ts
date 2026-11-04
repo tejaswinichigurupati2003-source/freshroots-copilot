@@ -12,7 +12,7 @@ export function orderText(flag: string, qty: number): string {
 
 /** The quantity Raghav settled on. Zero is "No order", which is a real answer for an approval. */
 export function finalQtyText(qty: number): string {
-  return qty > 0 ? `${qty} units` : "No order";
+  return qty === 0 ? "No order" : `${qty} ${qty === 1 ? "unit" : "units"}`;
 }
 
 const DECISION_LABEL: Record<string, string> = { approved: "Approved", edited: "Approved (quantity changed)", rejected: "Rejected" };

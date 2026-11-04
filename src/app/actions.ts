@@ -64,7 +64,7 @@ export async function pushToZoho(): Promise<DecisionState> {
       result.skippedZeroQty > 0 ? `${result.skippedZeroQty} with quantity 0 skipped` : "",
     ].filter(Boolean);
     if (result.failed.length > 0) {
-      return { error: `Could not send ${result.failed.map((f) => `${f.distributorId}: ${f.message}`).join("; ")}.${parts.length ? ` Sent: ${parts.join(", ")}.` : ""}` };
+      return { error: `Could not send ${result.failed.map((f) => `${f.distributorId}: ${f.message.replace(/\.$/, "")}`).join("; ")}.${parts.length ? ` Sent: ${parts.join(", ")}.` : ""}` };
     }
     if (parts.length === 0) return { message: `Nothing new to send.${notes.length ? ` (${notes.join(", ")})` : ""}` };
     return { message: `Draft POs created: ${parts.join(", ")}.${notes.length ? ` (${notes.join(", ")})` : ""}` };

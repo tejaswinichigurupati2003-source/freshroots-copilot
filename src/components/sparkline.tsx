@@ -19,8 +19,8 @@ export function Sparkline({ values, color = "var(--color-ink)" }: { values: numb
   return (
     <svg width={WIDTH} height={HEIGHT} role="img" aria-label={`Weekly sales, last ${values.length} weeks: ${values.join(", ")}`}>
       <line x1={PAD} x2={WIDTH - PAD} y1={meanY} y2={meanY} stroke="var(--color-rule-strong)" strokeDasharray="2 3" />
-      <polyline points={points.map((p) => p.map((n) => n.toFixed(1)).join(",")).join(" ")} fill="none" stroke="var(--color-ink)" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={last[0]} cy={last[1]} r="3.2" fill={color} stroke="var(--color-card)" strokeWidth="1.2" />
+      <polyline points={points.map((p) => p.map((n) => n.toFixed(1)).join(",")).join(" ")} fill="none" stroke="var(--color-forest)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={last[0]} cy={last[1]} r="3.2" fill={color} stroke="var(--color-card)" strokeWidth="1.4" />
     </svg>
   );
 }

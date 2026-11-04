@@ -20,7 +20,7 @@ Point at the top three rows: SKU016 (new launch, 3 weeks of history), SKU017 (fl
 Approve SKU001 (750 units). It shows "Approved: 750 units by Raghav" and its buttons turn grey.
 
 **4. Edit a quantity (1:45)**
-On SKU011, press **Edit quantity**, change 500 to 400, press **Save and approve**. The row shows "Approved (quantity changed): 400 units".
+On SKU011, press **Change qty**, change 500 to 400, press **Save and approve**. The row shows "Approved (quantity changed): 400 units".
 
 **5. Reject with a reason (2:15)**
 On SKU018, press **Reject**, leave the reason empty and press **Confirm reject**. A red message asks for a reason of at least 5 characters. Type "One-week spike, not a trend" and confirm. Say: "Raghav caught the spike."
@@ -32,7 +32,7 @@ Press **Send approved to Zoho**. The message lists draft POs per distributor. SK
 Run again, then reject most of the lines with short reasons (at least 5 characters each) until more than half of the decided lines are rejections. The amber banner appears: "Early warning: ... of recent recommendations were rejected." The system keeps running.
 
 **8. Kill switch above 50 lakh (3:45)**
-Set **Acting as** to Deepa. The dashboard becomes her read-only oversight view (waiting lines, Raghav's calls, rejection rate, loss, kill switch). Open **Monitor**. Enter quarter "Oct-Dec 2026", stockout 32 and overstock 20 (52 lakh) and press **Save loss**. The red banner appears. Switch back to Raghav, press **Run now**, and see it refuse. Press **Send approved to Zoho** and see it blocked.
+Set **Acting as** to Deepa. The dashboard becomes her read-only oversight view (waiting lines, Raghav's calls, rejection rate, loss, kill switch). Open **Monitor** in the sidebar. Enter quarter "Oct-Dec 2026", stockout 32 and overstock 20 (52 lakh) and press **Save loss**. The red banner appears. Switch back to Raghav, press **Run now**, and see it refuse. Press **Send approved to Zoho** and see it blocked.
 
 **9. Resume with the PIN (4:15)**
 On **Monitor**, enter a wrong PIN: "Wrong PIN." Then the right PIN: the switch turns off. The card shows who resumed it and when. Do this as Deepa, so her name is recorded. As Raghav the form is replaced by a note saying only Deepa can resume.

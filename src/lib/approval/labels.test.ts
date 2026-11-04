@@ -23,6 +23,11 @@ describe("decision wording", () => {
     expect(finalQtyText(400)).toBe("400 units");
   });
 
+  it("uses the singular for one unit", () => {
+    expect(finalQtyText(1)).toBe("1 unit");
+    expect(decisionText("edited", 1)).toBe("Approved (quantity changed): 1 unit");
+  });
+
   it("describes each call in one line", () => {
     expect(decisionText("approved", 750)).toBe("Approved: 750 units");
     expect(decisionText("approved", 0)).toBe("Approved: no order");

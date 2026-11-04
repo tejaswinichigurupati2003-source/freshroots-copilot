@@ -46,6 +46,8 @@ export interface Dashboard {
   rows: DashboardRow[];
   killSwitch: { active: boolean; reason: string | null; tripped_at: string | null };
   stockAsOf: string | null;
+  /** Months (as 2026-10) flagged as festival months in the calendar. */
+  festivalMonths: string[];
 }
 
 const RUN_COLUMNS = "id, as_of_date, triggered_by, status, error, started_at, finished_at";
@@ -62,11 +64,12 @@ type FlatRow = Omit<DashboardRow, "decision" | "exposure_inr"> & {
 };
 
 export async function loadDashboard(db: Db): Promise<Dashboard> {
-  const [latestRuns, shownRuns, killSwitches, stocks] = await Promise.all([
+  const [latestRuns, shownRuns, killSwitches, stocks, calendar] = await Promise.all([
     db.query<RunSummary>(`select ${RUN_COLUMNS} from runs order by started_at desc limit 1`),
     db.query<RunSummary>(`select ${RUN_COLUMNS} from runs where status = 'completed' order by started_at desc limit 1`),
     db.query<{ is_active: boolean; reason: string | null; tripped_at: string | null }>("select is_active, reason, tripped_at from system_state where key = 'kill_switch'"),
     db.query<{ as_of_date: string }>("select max(as_of_date) as as_of_date from stock_snapshots"),
+    db.query<{ year_month: string }>("select year_month from calendar where is_festival_month"),
   ]);
 
   const shown = shownRuns[0] ?? null;
@@ -109,5 +112,6 @@ export async function loadDashboard(db: Db): Promise<Dashboard> {
     rows,
     killSwitch: { active: ks?.is_active ?? false, reason: ks?.reason ?? null, tripped_at: ks?.tripped_at ?? null },
     stockAsOf: stocks[0]?.as_of_date ?? null,
+    festivalMonths: calendar.map((c) => c.year_month),
   };
 }

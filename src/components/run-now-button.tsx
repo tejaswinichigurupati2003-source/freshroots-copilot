@@ -25,10 +25,10 @@ export function RunNowButton() {
 
   return (
     <div className="flex flex-col items-start gap-2 sm:items-end">
-      <button type="button" onClick={run} disabled={running} className="btn btn-primary px-5 py-2.5 text-[15px]">
+      <button type="button" onClick={run} disabled={running} className="btn btn-lime px-6 py-2.5 text-[15px]">
         {running ? (
           <>
-            <span aria-hidden className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-paper border-t-transparent" />
+            <span aria-hidden className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-forest border-t-transparent" />
             Running the forecast
           </>
         ) : (
@@ -37,7 +37,7 @@ export function RunNowButton() {
       </button>
       {running && <p className="max-w-56 text-xs text-ink-soft sm:text-right">Reading stock, applying the rules, then asking the AI to write the reasons. Up to a minute.</p>}
       {error && (
-        <p role="alert" className="max-w-72 border-l-2 border-tomato pl-2 text-xs font-semibold text-tomato">
+        <p role="alert" className="max-w-72 rounded-xl bg-tomato-wash px-3 py-2 text-xs font-semibold text-tomato">
           {error}
         </p>
       )}

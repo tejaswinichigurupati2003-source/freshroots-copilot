@@ -12,6 +12,18 @@ export function nextScheduledRun(now: Date): Date {
   throw new Error("No scheduled run found in the next week");
 }
 
+/** The next `count` scheduled runs, soonest first. */
+export function nextScheduledRuns(now: Date, count: number): Date[] {
+  const runs: Date[] = [];
+  let cursor = now;
+  while (runs.length < count) {
+    const next = nextScheduledRun(cursor);
+    runs.push(next);
+    cursor = next;
+  }
+  return runs;
+}
+
 /** For example "Mon 26 Oct, 7:00 am IST". */
 export function formatRun(date: Date): string {
   const day = date.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short" });

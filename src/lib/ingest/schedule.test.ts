@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRun, nextScheduledRun } from "./schedule";
+import { formatRun, nextScheduledRun, nextScheduledRuns } from "./schedule";
 
 describe("nextScheduledRun", () => {
   it("is Monday 07:00 IST after a Thursday run", () => {
@@ -20,5 +20,12 @@ describe("nextScheduledRun", () => {
 
   it("skips the weekend", () => {
     expect(nextScheduledRun(new Date("2026-10-30T10:00:00Z")).toISOString()).toBe("2026-11-02T01:30:00.000Z");
+  });
+});
+
+describe("nextScheduledRuns", () => {
+  it("lists the following runs in order, alternating Monday and Thursday", () => {
+    const runs = nextScheduledRuns(new Date("2026-10-22T02:30:00Z"), 4).map((d) => d.toISOString().slice(0, 10));
+    expect(runs).toEqual(["2026-10-26", "2026-10-29", "2026-11-02", "2026-11-05"]);
   });
 });
