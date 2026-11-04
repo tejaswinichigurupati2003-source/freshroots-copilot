@@ -99,6 +99,18 @@ describe("createGateway", () => {
     expect(createGateway({ ZOHO_MODE: "mock" })).toBeInstanceOf(MockGateway);
   });
 
+  it("reads the id map from ZOHO_MAP_CSV when there is no file", () => {
+    const live = {
+      ZOHO_MODE: "live",
+      ZOHO_CLIENT_ID: "a",
+      ZOHO_CLIENT_SECRET: "b",
+      ZOHO_REFRESH_TOKEN: "c",
+      ZOHO_ORG_ID: "d",
+      ZOHO_MAP_CSV: ["Kind,Local_ID,Zoho_ID", "vendor,DIST001,V1", "item,SKU001,I1"].join("\n"),
+    };
+    expect(createGateway(live).mode).toBe("live");
+  });
+
   it("lists the missing variables in live mode", () => {
     expect(() => createGateway({ ZOHO_MODE: "live" })).toThrow(/ZOHO_CLIENT_ID.*ZOHO_ORG_ID/);
   });
