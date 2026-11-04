@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { EdgeBadge, FLAG_TONES, FlagBadge } from "@/components/badges";
 import { MonitorStrip } from "@/components/monitor-strip";
-import { OversightPanel } from "@/components/oversight";
+import { OversightPage } from "@/components/oversight";
 import { PushButton } from "@/components/push-button";
 import { RowActions } from "@/components/row-actions";
 import { RunNowButton } from "@/components/run-now-button";
@@ -270,6 +270,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
   const sorted = sortForReview(data.rows);
   const review = sorted.filter(needsReview);
   const quiet = sorted.filter((r) => !needsReview(r));
+  if (actor === "Deepa" && data.shownRun && monitor) {
+    const run = data.shownRun;
+    const runLabel = `Last run ${when(run.started_at)} by ${run.triggered_by.replace("manual:", "").replace("cron", "the schedule").replace("cli", "the command line")}.`;
+    return <OversightPage rows={review} monitor={monitor} festivalMonths={data.festivalMonths} runLabel={runLabel} />;
+  }
+
   const needle = q.toLowerCase();
   const shown = applyFilter(review, filter).filter((r) => matches(r, needle));
   const shownQuiet = quiet.filter((r) => matches(r, needle));
@@ -320,8 +326,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
               <UpcomingRuns festivalMonths={data.festivalMonths} />
             </div>
           </div>
-
-          {actor === "Deepa" && monitor && <OversightPanel reviewRows={review} monitor={monitor} />}
 
           <section className="card p-5">
             <div className="flex flex-wrap items-end justify-between gap-3">
