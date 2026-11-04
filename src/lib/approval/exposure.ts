@@ -1,4 +1,4 @@
-import { RULES_CONFIG } from "../rules/engine";
+import { DEFAULT_RULE_SETTINGS, type RuleSettings } from "../rules/engine";
 
 export interface ExposureInput {
   flag: string;
@@ -9,6 +9,8 @@ export interface ExposureInput {
   perishability: string;
   stockoutLossPerUnit: number;
   overstockLossPerUnit: number;
+  /** The rules the run used. Defaults to the documented rules. */
+  rules?: RuleSettings;
 }
 
 /** Halves round to the even number, as Python does, so figures match the answer key to the rupee. */
@@ -26,8 +28,9 @@ function roundHalfEven(n: number): number {
  */
 export function exposureInr(i: ExposureInput): number {
   if (i.avg12 === null) return 0;
-  const demand = i.festival ? i.avg12 * RULES_CONFIG.festivalUplift : i.avg12;
-  const limits = i.perishability === "High" ? RULES_CONFIG.highPerishableCover : RULES_CONFIG.generalCover;
+  const rules = i.rules ?? DEFAULT_RULE_SETTINGS;
+  const demand = i.festival ? i.avg12 * rules.festivalUplift : i.avg12;
+  const limits = i.perishability === "High" ? rules.highPerishableCover : rules.generalCover;
 
   if (i.flag === "STOCKOUT_RISK") return roundHalfEven(Math.max(0, limits.min * demand - i.effectiveStock) * i.stockoutLossPerUnit);
   if (i.flag === "OVERSTOCK_RISK") return roundHalfEven(Math.max(0, i.effectiveStock - limits.max * demand) * i.overstockLossPerUnit);

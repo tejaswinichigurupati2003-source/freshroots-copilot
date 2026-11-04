@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkFreshness, FreshnessError, resolveRunDate } from "./freshness";
 import { isAuthorizedCron } from "./cron-auth";
+import { DEFAULT_RULE_SETTINGS } from "../rules/engine";
 import { runPipeline } from "./pipeline";
 import { memoryStore, seedData, sourceFrom } from "./test-support";
 
@@ -15,6 +16,18 @@ const expected = parse(readFileSync(path.join(root, "data/expected/expected_resu
 }) as { SKU_ID: string; Expected_Flag: string; Expected_Order_Qty: string }[];
 
 describe("runPipeline", () => {
+  it("uses the saved rules, keeps a copy on every recommendation, and still matches the key with the documented ones", async () => {
+    const loose = { ...DEFAULT_RULE_SETTINGS, generalCover: { min: 1, max: 100 }, highPerishableCover: { min: 1, max: 100 } };
+    const custom = memoryStore();
+    await runPipeline("2026-10-19", "test", { source: sourceFrom(seedData()), store: custom.store, loadRules: async () => loose });
+    expect(custom.saved.every((r) => (r.signals.rulesUsed as typeof loose).generalCover.max === 100)).toBe(true);
+    expect(custom.saved.filter((r) => r.flag === "STOCKOUT_RISK").length).toBeLessThan(expected.filter((e) => e.Expected_Flag === "STOCKOUT_RISK").length);
+
+    const documented = memoryStore();
+    await runPipeline("2026-10-19", "test", { source: sourceFrom(seedData()), store: documented.store, loadRules: async () => DEFAULT_RULE_SETTINGS });
+    for (const e of expected) expect(documented.saved.find((r) => r.sku_id === e.SKU_ID)!.flag).toBe(e.Expected_Flag);
+  });
+
   it("saves one pending recommendation per SKU that equals the answer key", async () => {
     const { store, saved, runs, audit } = memoryStore();
     const result = await runPipeline("2026-10-19", "test", { source: sourceFrom(seedData()), store });

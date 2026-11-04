@@ -1,5 +1,6 @@
 import { carryOver, type CarryOver, type PastLine, type SentDraft } from "../approval/carry-over";
 import { exposureInr } from "../approval/exposure";
+import { rulesFromSignals } from "../rules/settings";
 import type { Db } from "./client";
 
 export interface RunSummary {
@@ -150,6 +151,7 @@ export async function loadDashboard(db: Db): Promise<Dashboard> {
         perishability: rest.perishability,
         stockoutLossPerUnit: stockout_loss,
         overstockLossPerUnit: overstock_loss,
+        rules: rulesFromSignals(rest.signals),
       }),
       open_po_arrivals: history.arrivals.get(rest.sku_id) ?? [],
       carry: carryOver({ flag: rest.flag, past: history.past.get(rest.sku_id) ?? [], drafts: history.drafts.get(rest.sku_id) ?? [], openPoIds: history.openPoIds }),

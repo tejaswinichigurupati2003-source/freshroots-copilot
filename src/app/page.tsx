@@ -4,6 +4,7 @@ import { MonitorStrip } from "@/components/monitor-strip";
 import { OversightPage } from "@/components/oversight";
 import { PushButton } from "@/components/push-button";
 import { RowActions } from "@/components/row-actions";
+import { RulesPanel } from "@/components/rules-panel";
 import { RunNowButton } from "@/components/run-now-button";
 import { Sparkline } from "@/components/sparkline";
 import { StatCards } from "@/components/stat-cards";
@@ -19,6 +20,8 @@ import { salesTrend } from "@/lib/approval/trend";
 import { purchaseValueInr, workingSteps } from "@/lib/approval/working";
 import { getDb } from "@/lib/db/client";
 import { loadDashboard, type Dashboard, type DashboardRow } from "@/lib/db/dashboard";
+import { loadRules, type RulesView } from "@/lib/db/rules-store";
+import { rulesFromSignals } from "@/lib/rules/settings";
 import { getActingAs } from "@/lib/session";
 import { getMonitorView } from "@/lib/shell-data";
 
@@ -60,7 +63,7 @@ const shortDate = (iso: string) => new Date(iso.length === 10 ? `${iso}T00:00:00
 /** For stockouts: how long the stock lasts, and a warning when the open PO would land too late. */
 function StockTiming({ row, stockAsOf }: { row: DashboardRow; stockAsOf: string }) {
   if (row.flag !== "STOCKOUT_RISK" || !stockAsOf) return null;
-  const days = daysOfStockLeft({ effectiveStock: row.effective_stock, avg12: (row.signals.avg12 as number | null | undefined) ?? null, festival: Boolean(row.signals.isFestivalMonth) });
+  const days = daysOfStockLeft({ effectiveStock: row.effective_stock, avg12: (row.signals.avg12 as number | null | undefined) ?? null, festival: Boolean(row.signals.isFestivalMonth), rules: rulesFromSignals(row.signals) });
   if (days === null) return null;
   const check = runOutCheck({ stockAsOf, daysLeft: days, arrivals: row.open_po_arrivals });
   return (
@@ -109,6 +112,7 @@ function Working({ row }: { row: DashboardRow }) {
     standardQty: row.standard_qty,
     recommendedQty: row.recommended_qty,
     unitCostInr: row.unit_cost_inr,
+    rules: rulesFromSignals(s),
   });
   return (
     <details className="mt-2">
@@ -251,8 +255,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
   const q = (params.q ?? "").trim();
 
   let data: Dashboard;
+  let rules: RulesView;
   try {
-    data = await loadDashboard(getDb());
+    [data, rules] = await Promise.all([loadDashboard(getDb()), loadRules(getDb())]);
   } catch (err) {
     return (
       <>
@@ -273,7 +278,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
   if (actor === "Deepa" && data.shownRun && monitor) {
     const run = data.shownRun;
     const runLabel = `Last run ${when(run.started_at)} by ${run.triggered_by.replace("manual:", "").replace("cron", "the schedule").replace("cli", "the command line")}.`;
-    return <OversightPage rows={review} monitor={monitor} festivalMonths={data.festivalMonths} runLabel={runLabel} />;
+    return <OversightPage rows={review} monitor={monitor} festivalMonths={data.festivalMonths} runLabel={runLabel} rules={rules} />;
   }
 
   const needle = q.toLowerCase();
@@ -360,6 +365,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
           </details>
         </>
       )}
+
+      <RulesPanel rules={rules} canEdit={can(actor, "edit_rules")} />
     </div>
   );
 }

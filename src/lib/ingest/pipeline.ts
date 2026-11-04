@@ -1,5 +1,5 @@
 import type { Explanation } from "../llm/contract";
-import { evaluateSkuWithSignals, type Flag } from "../rules/engine";
+import { DEFAULT_RULE_SETTINGS, evaluateSkuWithSignals, type Flag, type RuleSettings } from "../rules/engine";
 import { checkFreshness, FreshnessError } from "./freshness";
 import { loadPipelineData, type DataSource, type PipelineData, type SkuRow } from "./types";
 
@@ -46,7 +46,7 @@ export type PipelineResult =
 const finiteOrNull = (n: number | null) => (n !== null && Number.isFinite(n) ? n : null);
 
 /** Pure: turns loaded data into one recommendation per SKU using the rules engine. */
-export function buildRecommendations(runDate: string, data: PipelineData): RecommendationInsert[] {
+export function buildRecommendations(runDate: string, data: PipelineData, rules: RuleSettings = DEFAULT_RULE_SETTINGS): RecommendationInsert[] {
   const isFestivalMonth = data.calendar.find((c) => c.year_month === runDate.slice(0, 7))?.is_festival_month ?? false;
 
   return data.skus.map((sku) => {
@@ -65,7 +65,7 @@ export function buildRecommendations(runDate: string, data: PipelineData): Recom
       standardQty: sku.standard_reorder_qty,
       perishability: sku.perishability,
       isFestivalMonth,
-    });
+    }, rules);
 
     const spikeWeek = result.signals.oneWeekSpikeIndex === null ? null : weeks[result.signals.oneWeekSpikeIndex].week;
 
@@ -87,6 +87,7 @@ export function buildRecommendations(runDate: string, data: PipelineData): Recom
         unitsOnHand,
         openPoUnits,
         isFestivalMonth,
+        rulesUsed: rules,
         recentWeeks: weeks.slice(-TREND_WEEKS).map((w) => ({ week: w.week, units: w.units_sold })),
       },
       status: "pending" as const,
@@ -101,9 +102,9 @@ export function buildRecommendations(runDate: string, data: PipelineData): Recom
 export async function runPipeline(
   asOf: string,
   triggeredBy: string,
-  deps: { source: DataSource; store: RunStore; explain?: Explainer; beforeLoad?: () => Promise<unknown> },
+  deps: { source: DataSource; store: RunStore; explain?: Explainer; beforeLoad?: () => Promise<unknown>; loadRules?: () => Promise<RuleSettings> },
 ): Promise<PipelineResult> {
-  const { source, store, explain, beforeLoad } = deps;
+  const { source, store, explain, beforeLoad, loadRules } = deps;
   const runId = await store.createRun(asOf, triggeredBy);
   await store.audit({ actor: triggeredBy, action: "run_started", entity: "run", entity_id: runId, details: { asOf } });
 
@@ -124,7 +125,8 @@ export async function runPipeline(
     const data = await loadPipelineData(source);
     checkFreshness(asOf, data);
 
-    const recommendations = buildRecommendations(asOf, data);
+    const rules = (await loadRules?.()) ?? DEFAULT_RULE_SETTINGS;
+    const recommendations = buildRecommendations(asOf, data, rules);
     await store.saveRecommendations(runId, recommendations);
     if (explain) {
       // Explanations are words only. A failure here must not stop the run or change a quantity.

@@ -5,8 +5,11 @@ import { finalQtyText, orderText } from "@/lib/approval/labels";
 import { daysOfStockLeft, daysText } from "@/lib/approval/stockout-timing";
 import type { DashboardRow } from "@/lib/db/dashboard";
 import type { MonitorView } from "@/lib/db/monitor-store";
+import type { RulesView } from "@/lib/db/rules-store";
+import { rulesFromSignals } from "@/lib/rules/settings";
 import { FlagBadge } from "./badges";
 import { MonitorStrip } from "./monitor-strip";
+import { RulesPanel } from "./rules-panel";
 import { StatCards } from "./stat-cards";
 import { UpcomingRuns } from "./upcoming-runs";
 
@@ -49,7 +52,7 @@ function WaitingList({ rows }: { rows: DashboardRow[] }) {
             </thead>
             <tbody>
               {waiting.map((r) => {
-                const days = r.flag === "STOCKOUT_RISK" ? daysOfStockLeft({ effectiveStock: r.effective_stock, avg12: (r.signals.avg12 as number | null | undefined) ?? null, festival: Boolean(r.signals.isFestivalMonth) }) : null;
+                const days = r.flag === "STOCKOUT_RISK" ? daysOfStockLeft({ effectiveStock: r.effective_stock, avg12: (r.signals.avg12 as number | null | undefined) ?? null, festival: Boolean(r.signals.isFestivalMonth), rules: rulesFromSignals(r.signals) }) : null;
                 return (
                   <tr key={r.id}>
                     <td className="!py-3">
@@ -73,7 +76,7 @@ function WaitingList({ rows }: { rows: DashboardRow[] }) {
 }
 
 /** Deepa's whole page: how the run is going, how Raghav is deciding, where loss and the kill switch stand. */
-export function OversightPage({ rows, monitor, festivalMonths, runLabel }: { rows: DashboardRow[]; monitor: MonitorView; festivalMonths: string[]; runLabel: string }) {
+export function OversightPage({ rows, monitor, festivalMonths, runLabel, rules }: { rows: DashboardRow[]; monitor: MonitorView; festivalMonths: string[]; runLabel: string; rules: RulesView }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
@@ -100,6 +103,7 @@ export function OversightPage({ rows, monitor, festivalMonths, runLabel }: { row
 
       <OversightPanel reviewRows={rows} monitor={monitor} />
       <WaitingList rows={rows} />
+      <RulesPanel rules={rules} canEdit />
     </div>
   );
 }

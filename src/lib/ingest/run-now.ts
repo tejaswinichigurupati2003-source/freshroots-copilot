@@ -1,5 +1,6 @@
 import { getDb } from "../db/client";
 import { DbOpenPoStore } from "../db/push-store";
+import { loadRules } from "../db/rules-store";
 import { DbRunStore } from "../db/run-store";
 import { createGateway } from "../zoho/factory";
 import { syncOpenPos } from "../zoho/sync-open-pos";
@@ -22,6 +23,8 @@ export async function runNow(triggeredBy: string): Promise<PipelineResult> {
     explain: (items) => explainAll(items, { client, audit: (entry) => store.audit(entry) }),
     // Created here so a bad live Zoho setup becomes a failed run with a clear message. Mock mode does nothing.
     beforeLoad: () => syncOpenPos(createGateway(), new DbOpenPoStore(db)),
+    // The rules saved on the page. A run keeps a copy of what it used, so later edits never rewrite it.
+    loadRules: async () => (await loadRules(db)).settings,
   });
 
   // Which model ran and what it cost. Best effort: a missing column or a failed write never changes the run.

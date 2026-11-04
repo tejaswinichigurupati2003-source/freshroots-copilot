@@ -1,4 +1,5 @@
 import { RULES_CONFIG } from "../rules/engine";
+import { rulesFromSignals } from "../rules/settings";
 import type { RecommendationInsert } from "../ingest/pipeline";
 
 export const EDGE_CASE_TYPES = ["NONE", "NEW_LAUNCH", "DISTRIBUTOR_DROP", "ONE_OFF_SPIKE", "OTHER"] as const;
@@ -65,7 +66,8 @@ export function buildFacts(rec: RecommendationInsert, sku: { sku_name: string; s
     isFestivalMonth: boolean;
     recentWeeks: RecentWeek[];
   };
-  const limits = sku.perishability === "High" ? RULES_CONFIG.highPerishableCover : RULES_CONFIG.generalCover;
+  const rules = rulesFromSignals(rec.signals);
+  const limits = sku.perishability === "High" ? rules.highPerishableCover : rules.generalCover;
   const units = s.recentWeeks.map((w) => w.units);
   const last12 = units.slice(-RULES_CONFIG.historyWeeksRequired);
   const spikeUnits = s.oneWeekSpikeWeek ? (s.recentWeeks.find((w) => w.week === s.oneWeekSpikeWeek)?.units ?? null) : null;

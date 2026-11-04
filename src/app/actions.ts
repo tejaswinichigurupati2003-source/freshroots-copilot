@@ -8,6 +8,9 @@ import { getDb } from "@/lib/db/client";
 import { DbDecisionStore } from "@/lib/db/decision-store";
 import { DbMonitorStore } from "@/lib/db/monitor-store";
 import { DbPushStore } from "@/lib/db/push-store";
+import { loadRules, saveRules } from "@/lib/db/rules-store";
+import { DEFAULT_RULE_SETTINGS } from "@/lib/rules/engine";
+import { parseRuleForm, ruleChanges } from "@/lib/rules/settings";
 import { resumeKillSwitch } from "@/lib/monitor/kill-switch";
 import { recordLoss } from "@/lib/monitor/loss";
 import { checkRejectionWarning } from "@/lib/monitor/rejection";
@@ -100,4 +103,39 @@ export async function resumeAction(_previous: DecisionState, formData: FormData)
   revalidatePath("/");
   revalidatePath("/monitor");
   return result.ok ? { message: result.message } : { error: result.error };
+}
+
+/** Saves new rule numbers for the next run. Either role may change them; every change is written to the audit log. */
+export async function saveRulesAction(_previous: DecisionState, formData: FormData): Promise<DecisionState> {
+  const actor = await getActingAs();
+  if (!can(actor, "edit_rules")) return { error: denial(actor, "edit_rules") };
+
+  const fields: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) if (typeof value === "string") fields[key] = value;
+  const parsed = parseRuleForm(fields);
+  if (!parsed.ok) return { error: parsed.error };
+
+  const db = getDb();
+  const current = (await loadRules(db)).settings;
+  if (ruleChanges(current, parsed.settings).length === 0) return { error: "Nothing changed. These are already the rules in use." };
+
+  const { changed } = await saveRules(db, { settings: parsed.settings, actor, reason: parsed.reason, action: "rules_changed" });
+  revalidatePath("/");
+  revalidatePath("/audit");
+  return { message: `Saved ${changed} ${changed === 1 ? "change" : "changes"}. They apply from the next run.` };
+}
+
+/** Puts the documented rules back. */
+export async function resetRulesAction(): Promise<DecisionState> {
+  const actor = await getActingAs();
+  if (!can(actor, "edit_rules")) return { error: denial(actor, "edit_rules") };
+
+  const db = getDb();
+  const current = (await loadRules(db)).settings;
+  if (ruleChanges(current, DEFAULT_RULE_SETTINGS).length === 0) return { message: "Already using the documented rules." };
+
+  await saveRules(db, { settings: DEFAULT_RULE_SETTINGS, actor, reason: "Reset to the documented rules", action: "rules_reset" });
+  revalidatePath("/");
+  revalidatePath("/audit");
+  return { message: "Documented rules restored. They apply from the next run." };
 }

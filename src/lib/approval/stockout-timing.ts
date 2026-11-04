@@ -1,16 +1,17 @@
-import { RULES_CONFIG } from "../rules/engine";
+import { DEFAULT_RULE_SETTINGS, type RuleSettings } from "../rules/engine";
 
 export interface TimingInput {
   effectiveStock: number;
   /** 12-week average weekly sales, before any festival uplift. */
   avg12: number | null;
   festival: boolean;
+  rules?: RuleSettings;
 }
 
 /** Same demand figure the cover check uses (assumption A1), so days and weeks of cover always agree. */
 export function daysOfStockLeft(i: TimingInput): number | null {
   if (i.avg12 === null || i.avg12 <= 0) return null;
-  const weekly = i.festival ? i.avg12 * RULES_CONFIG.festivalUplift : i.avg12;
+  const weekly = i.festival ? i.avg12 * (i.rules ?? DEFAULT_RULE_SETTINGS).festivalUplift : i.avg12;
   return (i.effectiveStock / weekly) * 7;
 }
 

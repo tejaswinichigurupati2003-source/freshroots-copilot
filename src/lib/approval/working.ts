@@ -1,4 +1,4 @@
-import { RULES_CONFIG } from "../rules/engine";
+import { DEFAULT_RULE_SETTINGS, RULES_CONFIG, type RuleSettings } from "../rules/engine";
 import { rupees } from "./exposure";
 
 export interface WorkingInput {
@@ -13,6 +13,7 @@ export interface WorkingInput {
   standardQty: number;
   recommendedQty: number;
   unitCostInr: number;
+  rules?: RuleSettings;
 }
 
 export interface WorkingStep {
@@ -40,13 +41,14 @@ export function workingSteps(i: WorkingInput): WorkingStep[] {
     text: i.unitsOnHand === null ? `${n(i.effectiveStock)} units counting open POs.` : `${n(i.unitsOnHand)} on hand + ${n(open)} on open POs = ${n(i.effectiveStock)} units.`,
   });
 
-  const demand = i.festival ? i.avg12 * RULES_CONFIG.festivalUplift : i.avg12;
+  const rules = i.rules ?? DEFAULT_RULE_SETTINGS;
+  const demand = i.festival ? i.avg12 * rules.festivalUplift : i.avg12;
   steps.push({
     label: "Weekly demand",
-    text: i.festival ? `${n(i.avg12)} (12-week average) × ${RULES_CONFIG.festivalUplift} festival month = ${n(demand)} a week.` : `${n(i.avg12)} a week (12-week average).`,
+    text: i.festival ? `${n(i.avg12)} (12-week average) × ${rules.festivalUplift} festival month = ${n(demand)} a week.` : `${n(i.avg12)} a week (12-week average).`,
   });
 
-  const limits = i.perishability === "High" ? RULES_CONFIG.highPerishableCover : RULES_CONFIG.generalCover;
+  const limits = i.perishability === "High" ? rules.highPerishableCover : rules.generalCover;
   const cover = demand > 0 ? i.effectiveStock / demand : null;
   if (cover !== null) {
     steps.push({
@@ -57,10 +59,10 @@ export function workingSteps(i: WorkingInput): WorkingStep[] {
 
   if (i.avg4 !== null && i.avg12 > 0) {
     const pct = Math.round((i.avg4 / i.avg12 - 1) * 100);
-    const spike = i.avg4 > RULES_CONFIG.spikeRatio * i.avg12;
+    const spike = i.avg4 > rules.spikeRatio * i.avg12;
     steps.push({
       label: "Demand spike",
-      text: `Last 4 weeks average ${n(i.avg4)}, ${pct >= 0 ? `${pct}% above` : `${-pct}% below`} the 12-week average. ${spike ? "That is over" : "The spike test needs more than"} ${Math.round((RULES_CONFIG.spikeRatio - 1) * 100)}%.`,
+      text: `Last 4 weeks average ${n(i.avg4)}, ${pct >= 0 ? `${pct}% above` : `${-pct}% below`} the 12-week average. ${spike ? "That is over" : "The spike test needs more than"} ${Math.round((rules.spikeRatio - 1) * 100)}%.`,
     });
   }
 

@@ -12,6 +12,23 @@ export const RULES_CONFIG = {
   edge: { dropRatio: 0.75, oneWeekSpikeVsMedian: 2.5 },
 } as const;
 
+/** The numbers a planner may change. Everything else in RULES_CONFIG is fixed by how the data and screens are built. */
+export interface RuleSettings {
+  spikeRatio: number;
+  spikeOrderMultiple: number;
+  festivalUplift: number;
+  generalCover: { min: number; max: number };
+  highPerishableCover: { min: number; max: number };
+}
+
+export const DEFAULT_RULE_SETTINGS: RuleSettings = {
+  spikeRatio: RULES_CONFIG.spikeRatio,
+  spikeOrderMultiple: RULES_CONFIG.spikeOrderMultiple,
+  festivalUplift: RULES_CONFIG.festivalUplift,
+  generalCover: { ...RULES_CONFIG.generalCover },
+  highPerishableCover: { ...RULES_CONFIG.highPerishableCover },
+};
+
 export const flagSchema = z.enum(["STOCKOUT_RISK", "OVERSTOCK_RISK", "HIGH_DEMAND", "OK", "INSUFFICIENT_HISTORY"]);
 export type Flag = z.infer<typeof flagSchema>;
 
@@ -65,9 +82,10 @@ function median(xs: number[]): number {
 }
 
 /** Pure rules engine for one SKU. No I/O, no AI. */
-export function evaluateSku(raw: SkuInput): SkuResult {
+export function evaluateSku(raw: SkuInput, settings: RuleSettings = DEFAULT_RULE_SETTINGS): SkuResult {
   const input = skuInputSchema.parse(raw);
-  const { historyWeeksRequired, recentWeeks, spikeRatio, spikeOrderMultiple, festivalUplift } = RULES_CONFIG;
+  const { historyWeeksRequired, recentWeeks } = RULES_CONFIG;
+  const { spikeRatio, spikeOrderMultiple, festivalUplift } = settings;
   const effectiveStock = input.unitsOnHand + input.openPoUnits; // A2
 
   if (input.weeklySales.length < historyWeeksRequired) {
@@ -90,7 +108,7 @@ export function evaluateSku(raw: SkuInput): SkuResult {
 
   const demand = input.isFestivalMonth ? avg12 * festivalUplift : avg12;
   const weeksOfCover = demand > 0 ? effectiveStock / demand : Number.POSITIVE_INFINITY;
-  const limits = input.perishability === "High" ? RULES_CONFIG.highPerishableCover : RULES_CONFIG.generalCover; // A3
+  const limits = input.perishability === "High" ? settings.highPerishableCover : settings.generalCover; // A3
 
   const rulesFired: RuleId[] = [];
   if (input.isFestivalMonth) rulesFired.push("RULE_4_FESTIVAL_UPLIFT");
@@ -126,8 +144,8 @@ export function evaluateSku(raw: SkuInput): SkuResult {
 }
 
 /** Same as evaluateSku, plus edge-case signals computed by code for the LLM and the dashboard. */
-export function evaluateSkuWithSignals(input: SkuInput): SkuResultWithSignals {
-  const result = evaluateSku(input);
+export function evaluateSkuWithSignals(input: SkuInput, settings: RuleSettings = DEFAULT_RULE_SETTINGS): SkuResultWithSignals {
+  const result = evaluateSku(input, settings);
   const { historyWeeksRequired, edge } = RULES_CONFIG;
   const shortHistory = input.weeklySales.length < historyWeeksRequired;
 

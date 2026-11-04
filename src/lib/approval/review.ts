@@ -1,3 +1,4 @@
+import { rulesFromSignals } from "../rules/settings";
 import { daysOfStockLeft } from "./stockout-timing";
 
 export const FLAG_ORDER = ["STOCKOUT_RISK", "OVERSTOCK_RISK", "HIGH_DEMAND", "INSUFFICIENT_HISTORY", "OK"] as const;
@@ -28,6 +29,7 @@ function daysLeft(r: ReviewFields): number {
       effectiveStock: r.effective_stock,
       avg12: (r.signals.avg12 as number | null | undefined) ?? null,
       festival: Boolean(r.signals.isFestivalMonth),
+      rules: rulesFromSignals(r.signals),
     }) ?? Infinity
   );
 }
