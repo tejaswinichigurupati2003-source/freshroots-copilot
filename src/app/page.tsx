@@ -14,7 +14,9 @@ import { applyFilter, countByFilter, FILTERS, parseFilter, type FilterId } from 
 import { decisionText, orderText } from "@/lib/approval/labels";
 import { needsReview, sortForReview } from "@/lib/approval/review";
 import { can } from "@/lib/approval/roles";
+import { daysOfStockLeft, daysText, runOutCheck } from "@/lib/approval/stockout-timing";
 import { salesTrend } from "@/lib/approval/trend";
+import { purchaseValueInr, workingSteps } from "@/lib/approval/working";
 import { getDb } from "@/lib/db/client";
 import { loadDashboard, type Dashboard, type DashboardRow } from "@/lib/db/dashboard";
 import { getActingAs } from "@/lib/session";
@@ -53,7 +55,77 @@ function OrderCell({ row }: { row: DashboardRow }) {
   return /^\d+$/.test(text) ? <span className="num text-[22px] font-medium">{text}</span> : <span className="text-[14px] font-semibold text-ink-soft">{text}</span>;
 }
 
-function LedgerRow({ row, canDecide }: { row: DashboardRow; canDecide: boolean }) {
+const shortDate = (iso: string) => new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: iso.length === 10 ? "UTC" : "Asia/Kolkata" });
+
+/** For stockouts: how long the stock lasts, and a warning when the open PO would land too late. */
+function StockTiming({ row, stockAsOf }: { row: DashboardRow; stockAsOf: string }) {
+  if (row.flag !== "STOCKOUT_RISK" || !stockAsOf) return null;
+  const days = daysOfStockLeft({ effectiveStock: row.effective_stock, avg12: (row.signals.avg12 as number | null | undefined) ?? null, festival: Boolean(row.signals.isFestivalMonth) });
+  if (days === null) return null;
+  const check = runOutCheck({ stockAsOf, daysLeft: days, arrivals: row.open_po_arrivals });
+  return (
+    <>
+      <p className="mt-1.5 text-[12.5px] font-semibold text-tomato">About {daysText(days)} of stock left</p>
+      <p className="text-[12px] text-ink-soft">Runs out around {shortDate(check.runsOutOn)}, going by the {shortDate(stockAsOf)} stock count</p>
+      {check.lateArrival && <p className="mt-1 text-[12px] font-semibold text-tomato">Open PO arrives {shortDate(check.lateArrival)}, after that.</p>}
+    </>
+  );
+}
+
+/** What happened to this SKU in earlier runs, so a repeat flag or an unissued draft is not missed. */
+function CarryNotes({ row }: { row: DashboardRow }) {
+  const { streak, lastDecision, draftsNotCounted } = row.carry;
+  if (streak < 2 && !lastDecision && draftsNotCounted.length === 0) return null;
+  return (
+    <ul className="mt-2 space-y-1 border-l-2 border-mint-deep pl-2.5 text-[12.5px] leading-snug text-ink-soft">
+      {streak >= 2 && <li>Flagged the same way in {streak} runs in a row.</li>}
+      {lastDecision && (
+        <li>
+          Last decision: {lastDecision.decided_by} {decisionText(lastDecision.action, lastDecision.final_qty).toLowerCase()} on {shortDate(lastDecision.decided_at)}
+          {lastDecision.reason ? <> &ldquo;{lastDecision.reason}&rdquo;</> : null}.
+        </li>
+      )}
+      {draftsNotCounted.map((d) => (
+        <li key={d.externalId} className="font-semibold text-ink">
+          {d.externalId} for {d.quantity} units went to Zoho on {shortDate(d.createdAt)} and is not counted as stock yet.
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The arithmetic behind the line, folded away until asked for. */
+function Working({ row }: { row: DashboardRow }) {
+  const s = row.signals;
+  const steps = workingSteps({
+    flag: row.flag,
+    unitsOnHand: (s.unitsOnHand as number | null | undefined) ?? null,
+    openPoUnits: (s.openPoUnits as number | null | undefined) ?? null,
+    effectiveStock: row.effective_stock,
+    avg12: (s.avg12 as number | null | undefined) ?? null,
+    avg4: (s.avg4 as number | null | undefined) ?? null,
+    festival: Boolean(s.isFestivalMonth),
+    perishability: row.perishability,
+    standardQty: row.standard_qty,
+    recommendedQty: row.recommended_qty,
+    unitCostInr: row.unit_cost_inr,
+  });
+  return (
+    <details className="mt-2">
+      <summary className="cursor-pointer select-none text-[12.5px] font-bold text-forest underline underline-offset-2">Show the working</summary>
+      <dl className="mt-2 space-y-1.5 rounded-xl bg-mint p-3 text-[12.5px] leading-snug">
+        {steps.map((step) => (
+          <div key={step.label}>
+            <dt className="font-bold text-forest">{step.label}</dt>
+            <dd className="num text-ink">{step.text}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
+function LedgerRow({ row, canDecide, stockAsOf }: { row: DashboardRow; canDecide: boolean; stockAsOf: string }) {
   const hasSignals = Boolean(row.signals.shortHistory || row.signals.recentDrop || row.signals.oneWeekSpike);
   const tone = FLAG_TONES[row.flag]?.ink;
   return (
@@ -77,11 +149,14 @@ function LedgerRow({ row, canDecide }: { row: DashboardRow; canDecide: boolean }
         <div className="mt-1">
           <Sparkline values={trend(row)} color={tone} />
         </div>
+        <StockTiming row={row} stockAsOf={stockAsOf} />
       </td>
       <td className="min-w-52 max-w-sm">
         <p className="leading-snug">{row.reason ?? <span className="italic text-ink-faint">No explanation yet.</span>}</p>
         {row.evidence && <p className="mt-1.5 text-[13px] leading-snug text-ink-soft">{row.evidence}</p>}
         {row.explanation_source === "llm" && <p className="mt-1.5 text-[11px] font-bold uppercase tracking-wider text-ink-faint">AI note</p>}
+        {needsReview(row) && <CarryNotes row={row} />}
+        <Working row={row} />
       </td>
       <td>{needsReview(row) ? <DecisionStamp row={row} canDecide={canDecide} /> : <span className="text-sm italic text-ink-faint">No approval needed</span>}</td>
     </tr>
@@ -97,7 +172,7 @@ const COLUMNS: { label: string; right?: boolean }[] = [
   { label: "Decision" },
 ];
 
-function Ledger({ rows, canDecide }: { rows: DashboardRow[]; canDecide: boolean }) {
+function Ledger({ rows, canDecide, stockAsOf }: { rows: DashboardRow[]; canDecide: boolean; stockAsOf: string }) {
   return (
     <div className="overflow-x-auto">
       <table className="ledger min-w-[860px]">
@@ -112,7 +187,7 @@ function Ledger({ rows, canDecide }: { rows: DashboardRow[]; canDecide: boolean 
         </thead>
         <tbody>
           {rows.map((row) => (
-            <LedgerRow key={row.id} row={row} canDecide={canDecide} />
+            <LedgerRow key={row.id} row={row} canDecide={canDecide} stockAsOf={stockAsOf} />
           ))}
         </tbody>
       </table>
@@ -199,7 +274,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
   const shown = applyFilter(review, filter).filter((r) => matches(r, needle));
   const shownQuiet = quiet.filter((r) => matches(r, needle));
   const canDecide = can(actor, "decide");
-  const readyToPush = review.filter((r) => r.status === "approved" && r.decision && r.decision.final_qty > 0).length;
+  const readyRows = review.filter((r) => r.status === "approved" && r.decision && r.decision.final_qty > 0);
+  const readyToPush = readyRows.length;
+  const readyValue = readyRows.reduce((sum, r) => sum + (purchaseValueInr(r.decision!.final_qty, r.unit_cost_inr) ?? 0), 0);
+  const stockAsOf = data.stockAsOf ?? data.shownRun?.as_of_date ?? "";
   const zohoMode = process.env.ZOHO_MODE?.trim().toLowerCase() === "live" ? "live" : "mock";
   const salesTotals = salesTrend(data.rows);
 
@@ -217,13 +295,18 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
                 {salesTotals ? <WeeklyChart trend={salesTotals} /> : <div className="card-mint p-5 text-sm text-ink-soft">Not enough weeks of sales to draw a trend yet.</div>}
                 <div className="card-lime p-5 text-forest-deep">
                   {can(actor, "push") ? (
-                    <PushButton readyLines={readyToPush} mode={zohoMode} blocked={Boolean(monitor?.killSwitch.active)} />
+                    <PushButton readyLines={readyToPush} mode={zohoMode} blocked={Boolean(monitor?.killSwitch.active)} purchaseValue={readyValue > 0 ? rupees(readyValue) : undefined} />
                   ) : (
                     <div>
                       <p className="font-display text-[44px] font-semibold leading-none">
                         <span className="num">{readyToPush}</span>
                       </p>
                       <p className="mt-1 text-[15px] font-semibold">approved {readyToPush === 1 ? "line" : "lines"} ready for Zoho</p>
+                      {readyValue > 0 && (
+                        <p className="mt-1 text-[13px] font-semibold">
+                          Purchase value <span className="num">{rupees(readyValue)}</span> at unit cost
+                        </p>
+                      )}
                       <p className="mt-1.5 text-[13px] text-forest/80">Raghav sends approved lines to Zoho as draft purchase orders.</p>
                     </div>
                   )}
@@ -256,7 +339,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
               <FilterBar active={filter} counts={countByFilter(review)} q={q} />
             </div>
             <div className="mt-4">
-              {shown.length > 0 ? <Ledger rows={shown} canDecide={canDecide} /> : <p className="rounded-2xl bg-mint py-8 text-center text-ink-soft">Nothing matches.</p>}
+              {shown.length > 0 ? <Ledger rows={shown} canDecide={canDecide} stockAsOf={stockAsOf} /> : <p className="rounded-2xl bg-mint py-8 text-center text-ink-soft">Nothing matches.</p>}
             </div>
           </section>
 
@@ -267,7 +350,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
             </summary>
             {shownQuiet.length > 0 && (
               <div className="mt-3">
-                <Ledger rows={shownQuiet} canDecide={canDecide} />
+                <Ledger rows={shownQuiet} canDecide={canDecide} stockAsOf={stockAsOf} />
               </div>
             )}
           </details>

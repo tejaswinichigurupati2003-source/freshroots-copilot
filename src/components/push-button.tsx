@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { pushToZoho, type DecisionState } from "@/app/actions";
 
 /** Approved lines waiting to go to Zoho, and the one button that sends them. Sits on the lime card. */
-export function PushButton({ readyLines, mode, blocked }: { readyLines: number; mode: "mock" | "live"; blocked: boolean }) {
+export function PushButton({ readyLines, mode, blocked, purchaseValue }: { readyLines: number; mode: "mock" | "live"; blocked: boolean; purchaseValue?: string }) {
   const [state, formAction, pending] = useActionState<DecisionState>(pushToZoho, {});
   return (
     <form action={formAction} className="flex h-full flex-col justify-between gap-5">
@@ -13,6 +13,11 @@ export function PushButton({ readyLines, mode, blocked }: { readyLines: number; 
           <span className="num">{readyLines}</span>
         </p>
         <p className="mt-1 text-[15px] font-semibold">approved {readyLines === 1 ? "line" : "lines"} ready for Zoho</p>
+        {purchaseValue && (
+          <p className="mt-1 text-[13px] font-semibold">
+            Purchase value <span className="num">{purchaseValue}</span> at unit cost
+          </p>
+        )}
         <p className="mt-1.5 text-[13px] text-forest/80">
           One draft purchase order per distributor. {mode === "mock" ? "Drafts are kept in this app and not sent to Zoho." : "Drafts are created in Zoho Inventory."}
           {blocked && " Paused by the kill switch."}

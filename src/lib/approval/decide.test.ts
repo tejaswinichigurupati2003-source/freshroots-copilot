@@ -135,6 +135,12 @@ describe("sortForReview", () => {
     expect(sorted).toEqual(["SKU016", "SKU017", "SKU018", "SKU001", "SKU006", "SKU003", "SKU005"]);
   });
 
+  it("orders stockouts by days of stock left, soonest first", () => {
+    const stockout = (sku_id: string, effective_stock: number) => ({ ...row(sku_id, "STOCKOUT_RISK", { avg12: 70 }), effective_stock });
+    const sorted = sortForReview([stockout("SKU001", 100), stockout("SKU002", 20), stockout("SKU003", 50)]).map((r) => r.sku_id);
+    expect(sorted).toEqual(["SKU002", "SKU003", "SKU001"]);
+  });
+
   it("flags only non-OK or edge-case rows for review", () => {
     expect(needsReview(row("SKU005", "OK"))).toBe(false);
     expect(needsReview(row("SKU005", "OK", { recentDrop: true }))).toBe(true);
